@@ -115,7 +115,9 @@ def test_help_is_grouped_in_the_shared_panels_with_examples_and_sentences():
     from suriharvest.cli_help import PANELS
 
     top = runner.invoke(app, ["--help"]).output
-    titles = [m for m in re.findall(r"╭─ ([A-Z][a-z]+(?: [a-z]+)?) ─", top) if m != "Options"]
+    # Rich draws rounded corners (╭) on a modern terminal and square ones (┌) where it detects a legacy Windows
+    # console (a Windows CI runner has no VT console): match the panel title, not the corner glyph.
+    titles = [m for m in re.findall(r"[╭┌]─ ([A-Z][a-z]+(?: [a-z]+)?) ─", top) if m != "Options"]
     assert titles == ["Start here", "Rules", "Sources", "Publish", "Admin"] == list(PANELS)
     assert "Example: suriharvest init" in top and "Help for any command: suriharvest COMMAND --help." in top
     listed = {line.split()[1] for line in top.splitlines() if line.startswith("│ ") and len(line.split()) > 2}

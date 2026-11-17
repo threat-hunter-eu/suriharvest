@@ -3,6 +3,7 @@ GETs and chunked bodies are refused, the overview is cached, memory stays bounde
 
 from __future__ import annotations
 
+import os
 import random
 import re
 import sqlite3
@@ -303,12 +304,10 @@ def test_sources_page_is_cached_until_something_changes(client: TestClient):
     assert sum("json_each(g.flags)" in x for x in seen) == 1
 
 
-def test_sweep_never_follows_a_planted_link_nor_removes_others_folders(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_sweep_never_follows_a_planted_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """The temp folder is shared: a link named like a download folder must not be followed, chmod-ed or emptied."""
-    import os
     import stat
     import tempfile
-    import time
 
     from suriharvest.portable import rmtree
 
@@ -318,22 +317,40 @@ def test_sweep_never_follows_a_planted_link_nor_removes_others_folders(tmp_path:
     victim = tmp_path / "victim"
     (victim / "keep").mkdir(parents=True)
     victim.chmod(0o755)
+    mode = stat.S_IMODE(victim.stat().st_mode)  # 0o755 on POSIX; Windows only keeps the read-only flag
     link = shared / "suriharvest-web-planted"
-    link.symlink_to(victim, target_is_directory=True)
-    past = time.time() - 7200
-    os.utime(link, (past, past), follow_symlinks=False)
-    os.utime(victim, (past, past))
-    assert sweep_stale_downloads() == 0
-    assert stat.S_IMODE(victim.stat().st_mode) == 0o755 and (victim / "keep").exists() and link.is_symlink()
+    try:
+        link.symlink_to(victim, target_is_directory=True)
+    except OSError as e:  # Windows without Developer Mode or admin rights
+        pytest.skip(f"cannot create a symbolic link here: {e}")
+    # max_age=-1: every entry is old enough, so only the link check can keep it (Windows cannot set a link's own
+    # mtime: os.utime(follow_symlinks=False) is POSIX-only)
+    assert sweep_stale_downloads(max_age=-1) == 0
+    assert stat.S_IMODE(victim.stat().st_mode) == mode and (victim / "keep").exists() and link.is_symlink()
     # rmtree on a link (as the sweep did before) refuses without touching the target's mode
     rmtree(link, ignore_errors=True)
-    assert stat.S_IMODE(victim.stat().st_mode) == 0o755 and (victim / "keep").exists()
-    # a folder owned by another user is left alone
+    assert stat.S_IMODE(victim.stat().st_mode) == mode and (victim / "keep").exists()
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "getuid"), reason="POSIX-only: the owner check compares uids (Windows has no os.getuid and its temp folder is per user)"
+)
+def test_sweep_leaves_other_users_folders(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import tempfile
+    import time
+
+    shared = tmp_path / "tmp"
+    shared.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(shared))
     other = shared / "suriharvest-web-other"
     other.mkdir()
+    past = time.time() - 7200
     os.utime(other, (past, past))
     monkeypatch.setattr(os, "getuid", lambda: os.stat(other).st_uid + 1)
     assert sweep_stale_downloads() == 0 and other.exists()
+    monkeypatch.undo()
+    monkeypatch.setattr(tempfile, "tempdir", str(shared))
+    assert sweep_stale_downloads() == 1 and not other.exists()  # our own stale folder is removed
 
 
 def test_finished_downloads_being_sent_are_bounded(client: TestClient, monkeypatch: pytest.MonkeyPatch):
