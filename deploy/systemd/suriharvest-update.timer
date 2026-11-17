@@ -1,0 +1,11 @@
+# Starts suriharvest-update.service every day at 05:15 (a missed run starts at the next boot).
+[Unit]
+Description=Daily suriharvest update
+
+[Timer]
+OnCalendar=*-*-* 05:15
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

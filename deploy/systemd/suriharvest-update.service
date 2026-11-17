@@ -1,0 +1,21 @@
+# suriharvest: daily update of the Suricata rule corpus (sync, validate, index, gates, report).
+# Install: copy to /etc/systemd/system/, adjust SURIHARVEST_BIN and SURIHARVEST_HOME, then
+#   systemctl daemon-reload && systemctl enable --now suriharvest-update.timer
+# Exit code 1 (a source or a gate failed) marks the unit failed, which starts suriharvest-update-failed@.service.
+[Unit]
+Description=suriharvest: sync, validate and check Suricata rules
+Wants=network-online.target
+After=network-online.target
+OnFailure=suriharvest-update-failed@%n.service
+
+[Service]
+Type=oneshot
+Environment=SURIHARVEST_BIN=/opt/suriharvest/.venv/bin/suriharvest
+Environment=SURIHARVEST_HOME=/srv/suricata-rules
+# tokens for sources that need one (auth: VAR in sources.yaml) come from a root-only env file, never from sources.yaml
+EnvironmentFile=-/etc/suriharvest/env
+UMask=0077
+ExecStart=/bin/sh -c 'exec "$SURIHARVEST_BIN" update --wait 600'
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=4h

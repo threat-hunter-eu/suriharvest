@@ -1,0 +1,9 @@
+# fixture-beta: synthetic Suricata rules for the acceptance harness.
+# Copyright (c) 2026 Beta Fixture Publisher
+# Redistributed under the BSD-2-Clause licence (see LICENSE).
+# The last notice line ends with a backslash, which Suricata reads as a line continuation: a header copied
+# verbatim into a rules file must never swallow the rule after it. Notes: C:\fixture\notes\
+
+alert http any any -> any any (msg:"FIXTURE beta colliding sid"; flow:established,to_server; http.host; content:"collide.fixture.invalid"; classtype:bad-unknown; sid:9000001; rev:1;)
+alert dns any any -> any any (msg:"FIXTURE shared dns query"; dns.query; content:"shared.fixture.invalid"; nocase; classtype:bad-unknown; sid:9000008; rev:1;)
+alert tcp any 21 -> any any (msg:"FIXTURE beta orphan flowbit"; flow:established,to_client; content:"530 "; flowbits:isset,fx.orphan; classtype:misc-activity; sid:9100001; rev:1;)

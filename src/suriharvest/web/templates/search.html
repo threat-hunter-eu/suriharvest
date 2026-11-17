@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, sev, lic, lic_class, engs, eng, token %}
+{% block title %}{{ q ~ ' - ' if q }}Search{% endblock %}
+{% block content %}
+{% macro facet_link(tok, label_html, n) -%}
+{%- set on = tok in tokens -%}
+<li><a href="{{ qurl(base, q=q|toggle(tok)) }}"{% if on %} aria-current="true"{% endif %} rel="nofollow"><span class="box" aria-hidden="true"></span>{{ label_html }}{% if n is not none %}<span class="n">{{ n|num }}</span>{% endif %}</a></li>
+{%- endmacro %}
+
+<h1 class="sr-only">Search</h1>
+<form class="search-hero" action="/search" method="get" role="search">
+  <div class="searchbar">{{ icon('search', 'ico ico-lg') }}<input type="search" id="q" name="q" value="{{ q }}" aria-label="Search rules" aria-describedby="q-help" autocomplete="off" spellcheck="false" placeholder="Words, sid:, cve:, app:, classtype:, source:, flowbits:, metadata:key=value"></div>
+  {% if sort != 'best' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}{% if view == 'table' %}<input type="hidden" name="view" value="table">{% endif %}
+  <p class="examples" id="q-help">Try {% for ex in ['sid:2024897', 'cve:CVE-2021-44228', 'app:tls classtype:trojan-activity', '"cobalt strike" ioc:no', 'flowbits:ET.http.binary', 'metadata:malware_family=Cobalt_Strike'] %}<a href="/search?q={{ ex|urlencode }}">{{ ex }}</a>{% endfor %}<a href="/about#syntax">Syntax help</a></p>
+</form>
+{% if error %}<div class="notice notice-warn" role="alert">{{ icon('alert') }}<p>The search could not be read: {{ error }}. See the <a href="/about#syntax">search syntax</a>.</p></div>{% endif %}
+
+<div class="with-facets">
+  <aside class="facets" aria-label="Filters">
+    {% if facets %}
+    <details class="facet" open><summary>Severity</summary><ul>
+      {% set unrated = namespace(n=0) %}{% for v, n in facets.severity %}{% if v in ('critical', 'major', 'minor', 'informational') %}{{ facet_link('severity:' ~ v, sev(v), n) }}{% else %}{% set unrated.n = unrated.n + n %}{% endif %}{% endfor %}
+      {%- if unrated.n %}{{ facet_link('severity:unrated', sev(none), unrated.n) }}{% endif %}
+    </ul></details>
+    {% if engines %}
+    <details class="facet" open><summary>Suricata check</summary><ul>
+      {% set lo = dict(facets.loads) %}{% set fa = dict(facets.fails) %}
+      {% for e in engines|reverse %}{{ facet_link('loads:' ~ (e|eng_short), eng(e, [e], []) ~ ' loads in ' ~ (e|eng_label), lo.get(e, 0)) }}{% endfor %}
+      {% for e in engines|reverse if fa.get(e) %}{{ facet_link('fails:' ~ (e|eng_short), eng(e, [], [e]) ~ ' fails in ' ~ (e|eng_short), fa.get(e, 0)) }}{% endfor %}
+    </ul></details>
+    {% endif %}
+    <details class="facet" open><summary>Protocol</summary><ul>
+      {% for v, n in facets.app[:8] %}{{ facet_link('app:' ~ v, '<span class="mono">'|safe ~ v ~ '</span>'|safe, n) }}{% endfor %}
+    </ul>{% if facets.app|length > 8 %}<details class="more-list"><summary class="more">Show {{ facets.app|length - 8 }} more</summary><ul>{% for v, n in facets.app[8:] %}{{ facet_link('app:' ~ v, '<span class="mono">'|safe ~ v ~ '</span>'|safe, n) }}{% endfor %}</ul></details>{% endif %}</details>
+    <details class="facet" open><summary>Kind</summary><ul>
+      {% for v, n in facets.kind %}{% if v %}{{ facet_link('ioc:' ~ v, 'IOC: ' ~ IOC_WORDS.get(v, v), n) }}{% else %}{{ facet_link('ioc:no', 'Behaviour', n) }}{% endif %}{% endfor %}
+      <li><a href="{{ qurl(base, all=(0 if all else 1)) }}"{% if all %} aria-current="true"{% endif %} rel="nofollow" title="One rule per family is shown by default; this shows every variant"><span class="box" aria-hidden="true"></span>Show every variant</a></li>
+    </ul></details>
+    <details class="facet" open><summary>Classtype</summary><ul>
+      {% for v, n in facets.classtype[:5] if v %}{{ facet_link('classtype:' ~ v, '<span class="mono">'|safe ~ v ~ '</span>'|safe, n) }}{% endfor %}
+    </ul>{% set rest = facets.classtype[5:]|selectattr(0)|list %}{% if rest %}<details class="more-list"><summary class="more">Show {{ rest|length }} more</summary><ul>{% for v, n in rest %}{{ facet_link('classtype:' ~ v, '<span class="mono">'|safe ~ v ~ '</span>'|safe, n) }}{% endfor %}</ul></details>{% endif %}</details>
+    <details class="facet" open><summary>Source</summary>{% if facets.source|length > 6 %}<input type="search" class="js-only" placeholder="Filter source" aria-label="Filter source" data-filter="#facet-sources">{% endif %}<ul id="facet-sources">
+      {% for v, n in facets.source %}{{ facet_link('source:' ~ v, v, n) }}{% endfor %}
+    </ul></details>
+    <details class="facet" open><summary>Licence</summary><ul>
+      {% for v, n in facets.licence %}{{ facet_link('licence:' ~ v, lic_class(v), n) }}{% endfor %}
+    </ul></details>
+    {% set fl = facets.flags %}
+    <details class="facet"{% if open_attn %} open{% endif %}><summary>Needs attention</summary><ul>
+      {{ facet_link('flag:missing_setter', 'Needs a flowbit that nothing sets', fl.get('missing_setter', 0)) }}
+      {{ facet_link('flag:needs_files', 'Needs external files', fl.get('needs_files', 0)) }}
+      {% if remapped %}{{ facet_link('remapped:yes', 'Sid remapped (clash)', none) }}{% endif %}
+      {{ facet_link('enabled:no', 'Disabled upstream', facets.disabled) }}
+      {% if fl.get('deprecated') %}{{ facet_link('flag:deprecated', 'Deprecated', fl.get('deprecated')) }}{% endif %}
+      {% if fl.get('retired') %}{{ facet_link('flag:retired', 'Retired by the publisher', fl.get('retired')) }}{% endif %}
+    </ul></details>
+    <details class="facet"{% if open_syntax %} open{% endif %}><summary>Syntax</summary><ul>
+      {{ facet_link('dialect:suricata', 'Suricata only', fl.get('dialect:suricata', 0)) }}
+      {{ facet_link('dialect:both', 'Suricata and Snort', fl.get('dialect:both', 0)) }}
+      {{ facet_link('dialect:snort', 'Snort only', none) }}
+    </ul></details>
+    <details class="facet"><summary>Updated</summary><ul>
+      {% for label, days in [('Last 30 days', 30), ('Last year', 365)] %}{{ facet_link('updated>' ~ since(days), label, none) }}{% endfor %}
+    </ul></details>
+    {% endif %}
+  </aside>
+
+  <section aria-label="Results">
+    {% if tokens %}
+    <ul class="chips" aria-label="Active filters">
+      {% if words %}<li class="chip"><b>text</b> {{ words|join(' ') }} <a href="{{ qurl(base, q=filters_only) }}" aria-label="Remove the words">{{ icon('x') }}</a></li>{% endif %}
+      {% for tk in tokens if tk not in words %}{% set k, sep, v = tk.partition(':') %}
+      <li class="chip">{% if sep and v %}<b>{{ k }}</b> {{ v }}{% else %}<b>filter</b> {{ tk }}{% endif %} <a href="{{ qurl(base, q=q|toggle(tk)) }}" aria-label="Remove {{ tk }}">{{ icon('x') }}</a></li>
+      {% endfor %}
+      {% if all %}<li class="chip"><b>every variant</b> <a href="{{ qurl(base, all=0) }}" aria-label="Show one rule per family">{{ icon('x') }}</a></li>{% endif %}
+      <li><a class="small" href="/search">Clear all</a></li>
+    </ul>
+    {% endif %}
+
+    {% if total %}
+    <form id="sel" method="post" action="/export/download">{{ token() }}</form>
+    <div class="results-head">
+      <p class="total mb-0"><strong>{{ total|num }} rule{{ 's' if total != 1 }}</strong> match{{ 'es' if total == 1 }} &middot; <span class="muted small">{{ lines|num }} rule line{{ 's' if lines != 1 }}{% if lines > total %}, {{ (lines - total)|num }} {{ 'was a copy' if lines - total == 1 else 'were copies' }}{% endif %}</span></p>
+      <form class="row" method="get" action="/search">
+        <input type="hidden" name="q" value="{{ q }}">{% if all %}<input type="hidden" name="all" value="1">{% endif %}{% if view == 'table' %}<input type="hidden" name="view" value="table">{% endif %}
+        <label class="small muted" for="sort">Sort</label><select id="sort" name="sort" data-autosubmit>{% for k, label in sorts.items() %}<option value="{{ k }}"{% if k == sort %} selected{% endif %}{% if k == 'best' %} title="ranking aid, not a verdict"{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <noscript><button class="btn btn-sm" type="submit">Sort</button></noscript>
+        <span class="seg" role="group" aria-label="Layout"><a href="{{ qurl(base, view='cards') }}" aria-current="{{ 'true' if view == 'cards' else 'false' }}" title="Cards">{{ icon('list') }}<span class="sr-only">Cards</span></a><a href="{{ qurl(base, view='table') }}" aria-current="{{ 'true' if view == 'table' else 'false' }}" title="Table">{{ icon('table') }}<span class="sr-only">Table</span></a></span>
+        <a class="btn" href="/export?q={{ q|urlencode }}">{{ icon('export') }}Export all {{ total|num }}</a>
+      </form>
+    </div>
+
+    {% if view == 'table' %}
+    <div class="table-scroll"><table class="rows" id="results">
+      <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">sid</th><th scope="col">Rule</th><th scope="col">App</th><th scope="col">Severity</th><th scope="col">Check</th><th scope="col">Source</th><th scope="col">Licence</th></tr></thead>
+      <tbody>{% for g in rows %}{% set l = lics[g.logic_hash] %}
+      <tr data-key="{{ g.logic_hash }}" tabindex="-1"><td><input type="checkbox" name="h" value="{{ g.logic_hash }}" form="sel" aria-label="Select sid {{ g.sid }}"></td>
+        <td class="mono">{{ g.sid }}</td><td><a class="open" href="/rule/{{ g.logic_hash }}">{{ g.msg|mark(words) if g.msg else '(no msg)' }}</a></td><td class="mono">{{ g.app_layer }}</td><td>{{ sev(g.severity) }}</td><td>{{ engs(engines, g.loads_in, g.fails_in) }}</td>
+        <td>{{ g.canonical_source }}{% if g.n_sources > 1 %} <span class="muted xs">+{{ g.n_sources - 1 }}</span>{% endif %}</td><td>{{ lic(l[0], l[1]) }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}
+    <ul class="results" id="results">{% for g in rows %}{% set l = lics[g.logic_hash] %}{% set rm = remapped.get(g.logic_hash) %}
+      <li class="result" data-key="{{ g.logic_hash }}"><input type="checkbox" name="h" value="{{ g.logic_hash }}" form="sel" aria-label="Select sid {{ g.sid }}">
+        <a class="result-title open" href="/rule/{{ g.logic_hash }}">{{ g.msg|mark(words) if g.msg else '(no msg)' }}</a>
+        <div class="result-side">{{ sev(g.severity) }}{{ lic(l[0], l[1]) }}</div>
+        {% if summaries.get(g.logic_hash) %}<p class="result-plain">{{ summaries[g.logic_hash] }}</p>{% endif %}
+        <div class="result-meta"><span class="sid">sid <b>{{ g.sid if g.gid == 1 else g.gid ~ ':' ~ g.sid }}</b>{% if g.rev %} rev {{ g.rev }}{% endif %}</span><span class="ls">{{ g.action }} {{ g.protocol }}{% if g.buffers %} &middot; {{ g.buffers[:3]|join(', ') }}{% if g.buffers|length > 3 %} +{{ g.buffers|length - 3 }}{% endif %}{% endif %}</span>
+          {{ engs(engines, g.loads_in, g.fails_in) }}
+          {% if g.classtype %}<a class="badge kw" href="/search?q=classtype:{{ g.classtype|urlencode }}">{{ g.classtype }}</a>{% endif %}
+          {% if g.is_ioc %}<span class="badge ioc">IOC &middot; {{ IOC_WORDS.get(g.ioc_type, g.ioc_type) }}</span>{% endif %}
+          {% if 'missing_setter' in g.flags %}<span class="badge flag-bad" title="checks a flowbit that no rule in the index sets: it can never fire">flowbit nobody sets</span>{% endif %}
+          {% if 'needs_files' in g.flags %}<span class="badge flag-warn" title="needs a dataset or lua file next to the rules">needs files</span>{% endif %}
+          {% if not g.enabled_anywhere %}<span class="badge badge-outline">disabled upstream</span>{% endif %}
+          {% if 'deprecated' in g.flags or 'retired' in g.flags %}<span class="badge badge-outline">{{ 'deprecated' if 'deprecated' in g.flags else 'retired' }}</span>{% endif %}
+          <span>{{ g.copies }} cop{{ 'ies' if g.copies != 1 else 'y' }}{% if g.n_sources > 1 %} &middot; {{ g.n_sources }} sources{% endif %}</span><span>from <b>{{ g.canonical_source }}</b></span>
+          {% if rm %}<span class="collision">{{ icon('alert') }}sid clash: exported as <b class="mono">{{ g.gid }}:{{ rm[1] }}</b> (stable)</span>{% endif %}</div>
+      </li>
+    {% endfor %}</ul>
+    {% endif %}
+
+    <div class="selection-bar" role="region" aria-label="Selection" data-selection-bar>
+      <strong><span data-selected-count>0</span> selected</strong>
+      <button type="button" class="btn btn-sm js-only" data-action="select-page">Select page</button><button type="button" class="btn btn-sm js-only" data-action="clear-selection">Clear</button>
+      <span class="sep"></span>
+      {% if first_profile %}<button class="btn" type="submit" form="sel" formaction="/profiles/{{ first_profile }}/exclude-selected" title="Exclude the ticked rules from profile {{ first_profile }} (applies at the next build)">{{ icon('filter') }}Exclude from {{ first_profile }}&hellip;</button>{% endif %}
+      <button type="button" class="btn js-only" data-action="copy-selected">{{ icon('copy') }}Copy rules</button>
+      <button class="btn btn-primary" type="submit" form="sel">{{ icon('export') }}Download .rules</button>
+    </div>
+    {% if pages > 1 %}
+    <nav class="pager" aria-label="Pages">{% if prev_url %}<a class="btn btn-sm" href="{{ prev_url }}" rel="prev">Previous</a>{% else %}<span class="btn btn-sm" aria-disabled="true">Previous</span>{% endif %}<span>Page {{ page }} of {{ pages|num }}</span>{% if next_url %}<a class="btn btn-sm" href="{{ next_url }}" rel="next">Next</a>{% else %}<span class="btn btn-sm" aria-disabled="true">Next</span>{% endif %}</nav>
+    {% endif %}
+    {% elif not error %}
+    <div class="card"><div class="empty">
+      {% if q %}
+      <h2>No rules match "{{ q }}"</h2>
+      {% for h in hints or [] %}<p class="hint-value"><b>{{ h }}</b></p>{% endfor %}
+      {% if alone and alone[1] %}<p><b>{{ alone[0] }}</b> alone matches {{ alone[1]|num }} rules. Remove a filter to see them:</p>
+      <ul class="chips center">{% for tk in tokens if ':' in tk %}<li class="chip"><b>{{ tk.partition(':')[0] }}</b> {{ tk.partition(':')[2] }} <a href="{{ qurl(base, q=q|toggle(tk)) }}" aria-label="Remove {{ tk }}">{{ icon('x') }}</a></li>{% endfor %}</ul>
+      {% else %}<p>Try fewer words, or one filter at a time. Words search the rule name, contents, metadata and references.</p>{% endif %}
+      {% else %}
+      <h2>Search every rule in the index</h2><p>Type words, or start from an example above.</p>
+      {% endif %}
+    </div></div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

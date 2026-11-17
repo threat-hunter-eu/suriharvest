@@ -1,0 +1,12 @@
+{% extends "site_base.html" %}
+{% block title %}Suricata check{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Suricata check</h1><p class="lede">Rules per source that load or fail in each engine (<code>suricata -T</code>). Only rules that load are published for that engine.</p></div></div>
+<table class="rows">
+<thead><tr><th scope="col">Source</th>{% for e in engines %}<th scope="col" class="num">{{ e|eng_label }} loads</th><th scope="col" class="num">fails</th>{% endfor %}</tr></thead>
+<tbody>
+{% for src, per in validation %}
+<tr><td><b>{{ src }}</b></td>{% for e in engines %}{% set d = per.get(e, {}) %}<td class="num">{{ d.get('loads', 0)|num }}</td><td class="num">{% if d.get('fails') %}<span class="badge val-invalid">{{ d.fails|num }}</span>{% else %}0{% endif %}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

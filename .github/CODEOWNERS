@@ -1,0 +1,8 @@
+# The maintainers (@angstromissa, @elhoim) review everything. Only enforced once a ruleset on main has
+# "Require review from Code Owners" (see docs/automation.md#sid-map-state-branch for the rulesets).
+*                                   @angstromissa @elhoim
+/.github/                           @angstromissa @elhoim
+/pyproject.toml                     @angstromissa @elhoim
+/uv.lock                            @angstromissa @elhoim
+/src/suriharvest/sidmap_check.py    @angstromissa @elhoim
+/src/suriharvest/catalog/           @angstromissa @elhoim

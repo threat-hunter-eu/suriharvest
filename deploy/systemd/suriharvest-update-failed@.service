@@ -1,0 +1,9 @@
+# Runs when suriharvest-update.service fails: a gate failed, a source failed, or the update crashed.
+# Replace ExecStart with your notifier, e.g.
+#   ExecStart=/bin/sh -c 'journalctl -u %i -n 60 --no-pager | mail -s "suriharvest update failed on %H" admin@example.org'
+[Unit]
+Description=Report a failed suriharvest update (%i)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'journalctl -u %i -n 60 --no-pager | systemd-cat -t suriharvest-update-failed -p err'

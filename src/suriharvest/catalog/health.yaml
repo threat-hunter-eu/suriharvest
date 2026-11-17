@@ -1,0 +1,185 @@
+candidates: []
+excluded:
+- abuse.ch/sslbl-c2
+- malsilo/win-malware
+- ptresearch/attackdetection
+sources:
+  401trg-detections:
+    check: ok
+    licence_sha256: c19a0517e5b04945c711e5ddc2d9c0bd37ed2199428e624ac840bd1631daf9b1
+    licence_url: https://raw.githubusercontent.com/401trg/detections/HEAD/LICENSE.md
+    status: stale
+  abuse.ch-feodotracker:
+    check: ok
+    oisf:
+      license: CC0-1.0
+      name: abuse.ch/feodotracker
+    status: active
+  abuse.ch-sslbl:
+    check: ok
+    oisf:
+      license: CC0-1.0
+      name: abuse.ch/sslbl-blacklist
+    status: active
+  abuse.ch-sslbl-ja3:
+    check: ok
+    oisf:
+      license: CC0-1.0
+      min-version: 4.1.0
+      name: abuse.ch/sslbl-ja3
+    status: stale
+  aleksibovellan-nmap:
+    check: ok
+    licence_sha256: f3e8fe0e0fc46888fac2aee07f78dc3a01bc537bb19167b973fa7a04224bfaee
+    licence_url: https://raw.githubusercontent.com/aleksibovellan/opnsense-suricata-nmaps/HEAD/LICENSE
+    oisf:
+      license: MIT
+      min-version: 7.0.4
+      name: aleksibovellan/nmap
+    status: stale
+  arpsyndicate-vedas:
+    check: ok
+    licence_sha256: 178554c308b907f5ab4c9be433d4b6f30d27d98d2b8c958737db445081f51e42
+    licence_url: https://raw.githubusercontent.com/ARPSyndicate/vedas-signatures/HEAD/LICENSE
+    status: active
+  connectwise-cru:
+    check: ok
+    licence_sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+    licence_url: https://raw.githubusercontent.com/ConnectWise-Software/ConnectWise-CRU/HEAD/LICENSE
+    status: stale
+  daffainfo-suricata-rules:
+    check: ok
+    licence_sha256: c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4
+    licence_url: https://raw.githubusercontent.com/daffainfo/suricata-rules/HEAD/LICENSE
+    status: active
+  digitalbond-quickdraw:
+    check: ok
+    licence_sha256: a2ed3a7ce9999458ba16e024bb90b9327a8152a2de63d6ab6d8c2a427f561eeb
+    licence_url: https://raw.githubusercontent.com/digitalbond/Quickdraw-Snort/HEAD/LICENSE
+    status: stale
+  ditekshen-detection:
+    check: ok
+    licence_sha256: e9efb2f7daf11bb6379c06c16b870dddcecc4a10f8704bb8aad807529c8b3c97
+    licence_url: https://raw.githubusercontent.com/ditekshen/detection/HEAD/LICENSE.txt
+    status: stale
+  echap-stalkerware:
+    check: ok
+    oisf:
+      license: CC-BY-4.0
+      min-version: 8.0.0
+      name: echap/stalkerware
+    status: active
+  eset-malware-ioc:
+    check: ok
+    licence_sha256: 995182e185856186fbbe49f150409ae026aa4cda7e94f83c6ed737cbb77fa9c7
+    licence_url: https://raw.githubusercontent.com/eset/malware-ioc/HEAD/LICENSE
+    status: active
+  et-open:
+    check: ok
+    oisf:
+      license: MIT
+      name: et/open
+    status: active
+  etnetera-aggressive:
+    check: ok
+    oisf:
+      license: MIT
+      min-version: 4.0.0
+      name: etnetera/aggressive
+    status: active
+  fcsc-shovel:
+    check: ok
+    status: active
+  hunters-ledger:
+    check: ok
+    oisf:
+      license: CC-BY-4.0
+      min-version: 8.0.0
+      name: the-hunters-ledger/open
+    status: active
+  ipfire-dbl:
+    check: ok
+    oisf:
+      license: CC-BY-SA-4.0
+      min-version: 8.0.0
+      name: ipfire/dbl
+    status: active
+  julioliraup-antiphishing:
+    check: ok
+    licence_sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+    licence_url: https://raw.githubusercontent.com/julioliraup/Antiphishing/HEAD/LICENSE
+    oisf:
+      license: GPL-3.0
+      min-version: 7.0.0
+      name: julioliraup/antiphishing
+    status: active
+  oisf-trafficid:
+    check: ok
+    oisf:
+      license: MIT
+      min-version: 4.0.0
+      name: oisf/trafficid
+    status: stale
+  opnsense-rules:
+    check: ok
+    licence_sha256: b9a0676492db1e6082ff0aed71be14482f43f6477694340bc04647b803787b00
+    licence_url: https://raw.githubusercontent.com/opnsense/rules/HEAD/LICENSE
+    status: active
+  pawpatrules:
+    check: ok
+    oisf:
+      license: CC-BY-SA-4.0
+      min-version: 7.0.3
+      name: pawpatrules
+    status: active
+  ptrules-open:
+    check: ok
+    oisf:
+      license: MIT
+      min-version: 5.0.0
+      name: ptrules/open
+    status: active
+  quadrantsec-suricata-rules:
+    check: ok
+    licence_sha256: 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+    licence_url: https://raw.githubusercontent.com/quadrantsec/suricata-rules/HEAD/LICENSE
+    status: active
+  red-team-tool-countermeasures:
+    check: ok
+    licence_sha256: a5b8bd9ae96c630bbf229d61c5c5def20274e00be39abfd2fab4d7879ceab462
+    licence_url: https://raw.githubusercontent.com/mandiant/red_team_tool_countermeasures/HEAD/LICENSE.txt
+    status: stale
+  snort-community:
+    check: ok
+    status: active
+  stamus-lateral:
+    check: ok
+    oisf:
+      license: GPL-3.0-only
+      min-version: 6.0.6
+      name: stamus/lateral
+    status: active
+  sudohyak-suricata-rules:
+    check: ok
+    licence_sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+    licence_url: https://raw.githubusercontent.com/sudohyak/suricata-rules/HEAD/LICENSE
+    status: stale
+  tgreen-hunting:
+    check: ok
+    licence_sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+    licence_url: https://raw.githubusercontent.com/travisbgreen/hunting-rules/HEAD/LICENSE
+    oisf:
+      license: GPLv3
+      min-version: 7.0.3
+      name: tgreen/hunting
+    status: active
+  travisbgreen-hunting-repo:
+    check: ok
+    licence_sha256: 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+    licence_url: https://raw.githubusercontent.com/travisbgreen/hunting-rules/HEAD/LICENSE
+    status: active
+  volexity-threat-intel:
+    check: ok
+    licence_sha256: ada32b3747ce108d5e8bab7918af94abbd03f2fe2a46304f74c6333bbfd914ed
+    licence_url: https://raw.githubusercontent.com/volexity/threat-intel/HEAD/LICENSE.txt
+    status: active

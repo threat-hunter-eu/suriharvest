@@ -1,0 +1,48 @@
+{% extends "site_base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Published rules</h1><p class="lede">Free, redistributable Suricata rules from several publishers: merged, deduplicated, sid clashes fixed and every rule checked with <code>suricata -T</code>{% for e, v in engines %}{% if loop.first %} on {% endif %}{{ e|eng_label }}{% if not loop.last %} and {% endif %}{% endfor %}.</p></div>
+</div>
+
+<section class="hero" aria-label="Release at a glance">
+  <a class="stat" href="search.html"><span class="stat-n">{{ unique|num }}</span><span class="stat-l">Unique rules</span><span class="stat-d">one entry per rule logic</span></a>
+  {% for e, v in engines[:2] %}
+  <a class="stat" href="validation.html"><span class="stat-n">{{ v.rules|num }}</span><span class="stat-l">In {{ e|eng_label }}</span><span class="stat-d">Suricata {{ v.version or '?' }} &middot; {{ (v.by_source or {})|length }} sources</span></a>
+  {% endfor %}
+  <a class="stat" href="changes.html"><span class="stat-n">{{ duplicates|num }}</span><span class="stat-l">Duplicates left out</span><span class="stat-d">{{ n_collisions|num }} sid clashes remapped</span></a>
+</section>
+
+<div class="stack">
+<section class="card" aria-labelledby="h-dl">
+  <div class="card-head"><h2 id="h-dl">Download</h2></div>
+  <div class="card-body">
+    {% for e, v in engines %}{% set n = e|eng_short %}
+    <p><b>{{ e|eng_label }}</b>: with suricata-update, <code>suricata-update add-source suriharvest-{{ n }} &lt;url of suriharvest-{{ n }}.tar.gz&gt;</code>, or the flat file <code>suricata-{{ n }}.rules</code>.</p>
+    {% endfor %}
+    {% if downloads %}
+    <table class="rows">
+      <thead><tr><th scope="col">File</th><th scope="col">SHA-256</th></tr></thead>
+      <tbody>{% for d in downloads %}<tr><td>{% if d.url %}<a href="{{ d.url }}">{{ d.name }}</a>{% else %}{{ d.name }}{% endif %}</td><td class="mono xs">{{ d.sha256 }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<p class="small muted">No SHA256SUMS in the release folder.</p>{% endif %}
+  </div>
+</section>
+
+{% if gates %}
+<section class="card" aria-labelledby="h-gates">
+  <div class="card-head"><h2 id="h-gates">Release gates</h2></div>
+  <div class="card-body"><table class="rows"><thead><tr><th scope="col">Gate</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead>
+  <tbody>{% for g in gates %}<tr><td>{{ g.name }}</td><td><span class="badge {{ 'val-valid' if g.status == 'pass' else ('val-invalid' if g.status == 'fail' else 'badge-outline') }}">{{ g.status }}</span></td><td class="small">{{ g.detail }}</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endif %}
+
+{% if changes and changes.added is defined %}
+<section class="card" aria-labelledby="h-ch">
+  <div class="card-head"><h2 id="h-ch">Since the previous release</h2><a class="small" href="changes.html">Details</a></div>
+  <div class="card-body"><p class="mb-0">{{ changes.added|length|num }} added &middot; {{ changes.removed|length|num }} removed &middot; {{ changes.modified|length|num }} modified</p></div>
+</section>
+{% endif %}
+</div>
+<p class="xs muted mt-4">Content id <span class="mono">{{ summary.content_id or '' }}</span></p>
+{% endblock %}

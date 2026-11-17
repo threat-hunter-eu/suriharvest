@@ -1,0 +1,96 @@
+[project]
+name = "suriharvest"
+version = "0.1.0"
+description = "Public Suricata rule aggregator: collect free rulesets, deduplicate, validate with suricata -T and build merged rulesets"
+authors = [{ name = "suriharvest contributors" }]
+keywords = ["suricata", "ids", "rules", "threat-detection", "aggregator"]
+classifiers = [
+    # The licence is the SPDX expression in `license` below (PEP 639): code MIT, the web UI's bundled fonts OFL-1.1.
+    # No "License :: OSI Approved :: MIT License" classifier: PEP 639 deprecates License :: classifiers next to a
+    # licence expression and PyPI refuses an upload that has both. Python 3.12 and 3.13 are tested in CI.
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT AND OFL-1.1"  # code MIT; the web UI's bundled fonts OFL-1.1 (see NOTICE)
+license-files = ["LICENSE", "NOTICE", "src/suriharvest/web/static/fonts/*-OFL.txt"]
+dependencies = [
+    "alembic>=1.13",
+    "fastapi>=0.162.0",
+    "httpcore>=1.0",
+    "httpx>=0.27",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.33",
+    "pyyaml>=6.0",
+    "rich>=13",
+    "sqlalchemy>=2.0",
+    "typer>=0.12",
+    "uvicorn>=0.54.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/threat-hunter-eu/suriharvest"
+Website = "https://threat-hunting.eu/tools/suriharvest"
+Issues = "https://github.com/threat-hunter-eu/suriharvest/issues"
+
+[project.scripts]
+suriharvest = "suriharvest.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3.8",
+    "ruff>=0.6",
+]
+ui = [
+    "playwright>=1.40",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not engine and not network and not docs'"
+markers = [
+    "engine: needs a real Suricata binary (run with -m engine)",
+    "network: downloads real sources",
+    "proxy: goes through a real forward proxy (SURIHARVEST_TEST_PROXY; see tests/test_proxy_real.py)",
+    "docs: runs the README/docs shell examples on an offline fixture workspace (needs suricata; run with -m docs)",
+]
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+extend-exclude = ["src/suriharvest/migrations/versions", "scripts/privacy_gate.py", "tests/acceptance"]  # the gate is a standalone stdlib script (own style)
+
+[tool.ruff.lint]
+# Same rule set as sigharvest.
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "SIM", "RUF"]
+ignore = ["S603", "S607", "S101", "RUF001", "RUF002", "RUF003", "B008", "RUF012", "UP047"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 160 # as sigharvest; the formatter keeps line-length 140
+
+[tool.ruff.lint.per-file-ignores]
+"src/suriharvest/web/app.py" = ["B008"]  # FastAPI's Form() defaults
+"tests/*" = ["S"]
+# Suricata rule fixtures: one rule per line, cannot be wrapped.
+"tests/test_docs.py" = ["E501"]
+"tests/test_ownership_datasets.py" = ["E501"]
+"tests/test_pipeline.py" = ["E501"]

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, sev, lic, lic_class, eng, when, token, copy_btn, age_chart, spark, composition %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+{% set e0 = engines[0] if engines else none %}
+<div class="page-head">
+  <div><h1>Overview</h1><p class="lede">Free Suricata rules from your sources: test-loaded{% if engines %} in {% for e in engines %}{{ e.name|eng_label }}{% if not loop.last %} and {% endif %}{% endfor %}{% endif %}, duplicates merged, sid clashes fixed. One entry per rule, with every copy and its licence.</p></div>
+  <div class="actions">
+    <form action="/jobs/update" method="post">{{ token() }}<button class="btn" type="submit" title="Download every enabled source, check, index and rebuild profiles"{% if running %} disabled{% endif %}>{{ icon('refresh') }}Download new rules</button></form>
+    <a class="btn btn-primary" href="/export">{{ icon('export') }}Export a ruleset</a>
+  </div>
+</div>
+
+{% if run %}
+{% set ch = run.changes or {} %}{% set top = cards[0] if cards else none %}
+{% set n_fail = st.failing|length %}{% set n_ok = st.n_sources - n_fail %}
+{% if run.status == 'failed' and not run.accepted %}
+<div class="notice notice-warn" role="alert">{{ icon('alert') }}<p><strong>The last update did not pass its checks</strong>{% if run.gates %} ({% for gt in run.gates if gt.status == 'fail' %}{{ gt.name }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}, so your rulesets were not rebuilt. <a href="/runs/{{ run.id }}">Review the update</a>; if the change was intended, accept it with <code>suriharvest runs accept latest</code>.</p></div>
+{% else %}
+<div class="status-line" role="status">{{ icon('changes') }}<p>{% if run.status == 'running' %}Update running{% else %}Updated {{ when(run.started_at) }}{% endif %}<span class="sep">&middot;</span>{% if n_fail %}{{ n_ok|num }} of {{ st.n_sources|num }} sources up to date<span class="sep">&middot;</span><a href="/sources?health=failing">{{ n_fail|num }} skipped &mdash; details</a>{% else %}{{ st.n_sources|num }} source{{ 's' if st.n_sources != 1 }} up to date{% endif %}
+  {%- if ch %}<span class="sep">&middot;</span><a href="/builds">{{ ch.get('new_logic', 0)|num }} new, {{ ch.get('gone_logic', 0)|num }} removed</a>{% endif %}
+  {%- if top and top.b %}<span class="sep">&middot;</span><a href="/builds?profile={{ top.t.name }}">{{ top.t.name }}: {{ top.b.rules|num }} rules ready</a>{% endif %}</p></div>
+{% endif %}
+{% endif %}
+
+<section class="yield" aria-label="Your index at a glance">
+  <div class="yield-lead">
+    <p class="yield-l">Unique rules</p>
+    <a class="yield-n" href="/search">{{ total|num }}</a>
+    <p class="yield-d">One entry per rule logic, from {{ occ|num }} rule lines.{% if run and run.changes and run.changes.get('new_logic') and run.changes.get('new_logic') < total %} <span class="up">+{{ run.changes.get('new_logic', 0)|num }}</span> in the last update.{% endif %}</p>
+    {{ composition(severity, 'By signature severity') }}
+    {{ spark(trend, ('unchanged' if not trend.delta else '{:+,}'.format(trend.delta)) ~ ' over the last ' ~ trend.n ~ ' updates') if trend }}
+  </div>
+  {{ age_chart(ages) }}
+  <dl class="yield-facts">
+    {% if e0 %}{% set checked = e0.loads + e0.fails %}
+    <div><dt>Load in {{ e0.name|eng_label }}</dt><dd><a href="/search?q=loads:{{ e0.short }}">{% if checked %}{{ '%.1f'|format(100 * e0.loads / checked) }}%{% else %}&ndash;{% endif %}</a></dd><dd class="note">{{ e0.loads|num }} rules{% for e in engines[1:] %}{% set c = e.loads + e.fails %}; {% if c %}{{ '%.1f'|format(100 * e.loads / c) }}%{% else %}not checked{% endif %} in {{ e.name|eng_label }}{% endfor %}{% if e0.unchecked %}; {{ e0.unchecked|num }} not checked{% endif %}</dd></div>
+    {% else %}
+    <div><dt>Suricata check</dt><dd><a href="/jobs">&ndash;</a></dd><dd class="note">no engine in suriharvest.yaml</dd></div>
+    {% endif %}
+    <div><dt>Duplicates merged</dt><dd><a href="/builds">{{ (occ - total if occ > total else 0)|num }}</a></dd><dd class="note">rule lines whose logic another rule already has</dd></div>
+    <div><dt>Sid clashes fixed</dt><dd><a href="/search?q=remapped:yes">{{ remapped|num }}</a></dd><dd class="note">remapped once, stable in every build</dd></div>
+  </dl>
+</section>
+
+<section class="card mb-4" aria-labelledby="h-proto">
+  <div class="card-head"><h2 id="h-proto">By protocol <span class="sub">app-layer of each rule</span></h2></div>
+  <div class="card-body"><div class="heat-strip c12">{% for a, n in apps %}<a href="/search?q=app:{{ a }}" title="{{ a }}: {{ n|num }} rules" aria-label="{{ a }}: {{ n|num }} rules"><span class="blk {{ n|heat(app_top) }}"></span><span class="lbl" aria-hidden="true">{{ a }}</span><span class="n" aria-hidden="true">{{ n|num }}</span></a>{% endfor %}</div>
+    <div class="spread mt-4"><p class="xs muted mb-0">{{ rep.get('behaviour_groups', 0)|num }} behaviour rules, {{ rep.get('ioc_groups', 0)|num }} single-indicator (IOC) rules{% if iocs %}: {% for t, n in iocs[:5] %}{{ n|num }} {{ {'domain': 'domains', 'ip': 'IPs', 'url': 'URLs', 'ja3': 'JA3', 'ja3s': 'JA3S', 'cert_fingerprint': 'TLS certificates', 'cert_serial': 'certificate serials', 'dataset': 'dataset lists'}.get(t, t) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}. Click a protocol to search it.</p>
+      <span class="legend" aria-hidden="true">fewer <span class="h0"></span><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span><span class="h5"></span> more</span></div></div>
+</section>
+
+<div class="dash">
+  <div class="stack">
+    <section class="card" aria-labelledby="h-engine">
+      {% set nfail = engines|sum(attribute='fails') %}
+      <div class="card-head"><h2 id="h-engine">Suricata check <span class="sub">every rule through <code class="nowrap">suricata -T</code>, cached by rule text</span></h2>{% if nfail %}<a class="small" href="/search?q=fails:{{ e0.short }}">See the {{ e0.fails|num }} failures</a>{% endif %}</div>
+      <div class="card-body">
+        {% if engines %}
+        <div class="engine-rows">
+          {% for e in engines %}{% set all_ = e.loads + e.fails + e.unchecked %}
+          <div class="engine-row"><span class="name"><b>{{ e.name|eng_label }}</b><span>{{ e.version or 'not run yet' }}{% if e.checked %} &middot; checked {{ e.checked|reltime }}{% endif %}</span></span>
+            <span class="split-bar" role="img" aria-label="{{ e.loads|num }} load, {{ e.fails|num }} do not load, {{ e.unchecked|num }} not checked">{% if e.loads %}<span class="ok {{ e.loads|wcls(all_) }}"></span>{% endif %}{% if e.fails %}<span class="fail {{ e.fails|wcls(all_) }}"></span>{% endif %}{% if e.unchecked %}<span class="skip {{ e.unchecked|wcls(all_) }}"></span>{% endif %}</span>
+            <span class="pct">{% if e.loads + e.fails %}<b>{{ '%.1f'|format(100 * e.loads / (e.loads + e.fails)) }}%</b> <span class="xs muted">{{ e.fails|num }} fail</span>{% else %}<span class="xs muted">not checked</span>{% endif %}</span></div>
+          {% endfor %}
+        </div>
+        {% for e in engines if e.reasons %}
+        <p class="small mt-4 mb-0"><b>Why rules fail in {{ e.name|eng_label }}</b> <span class="muted">(top {{ [3, e.reasons|length]|min }} of {{ e.reasons|length }} reason{{ 's' if e.reasons|length != 1 }})</span></p>
+        <ul class="reasons">{% for cat, words, n in e.reasons[:3] %}<li><span>{{ words }}</span><a href="/search?q=fails:{{ e.short }}">{{ n|num }}</a></li>{% endfor %}</ul>
+        {% else %}
+        <p class="small mt-4 mb-0"><b>Every checked rule loads.</b> <span class="muted">Rules that fail would be listed here with the reason.</span></p>
+        {% endfor %}
+        <p class="xs muted mt-4 mb-0">A rule that does not load in an engine is left out of that engine's exports automatically, with the reason in <code>excluded.jsonl</code>.</p>
+        {% else %}<p class="small mb-0">No Suricata engine is configured: add <code>engines:</code> to <code>suriharvest.yaml</code> to check every rule.</p>{% endif %}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-changes">
+      <div class="card-head"><h2 id="h-changes">Recent changes {% if run %}<span class="sub">last update, {{ run.started_at.strftime('%d %b %Y %H:%M') }} UTC</span>{% endif %}</h2>{% if run and run.changes %}{% set n_changes = run.changes.get('new_logic', 0) + run.changes.get('gone_logic', 0) %}<a class="small" href="/builds">{% if n_changes %}All {{ n_changes|num }} changes{% else %}Builds &amp; changes{% endif %}</a>{% endif %}</div>
+      <div class="card-body">{% if changes %}<ul class="changes">
+        {% for kind, r, g in changes %}<li><span class="kind kind-{{ kind }}">{{ kind }}</span><span>{% if g %}<a href="/rule/{{ r.logic_hash }}">{{ r.msg or g.msg }}</a>{% else %}{{ r.msg }}{% endif %}<span class="meta mono">sid {{ r.sid }}{% if g %} &middot; {{ g.app_layer }} &middot; {{ g.canonical_source }}{% endif %}</span></span>{% if g %}{{ sev(g.severity) }}{% else %}<span></span>{% endif %}</li>{% endfor %}
+      </ul>{% elif run %}<p class="small muted mb-0">The last update changed nothing.</p>{% else %}<p class="small muted mb-0">No <code>suriharvest update</code> yet: changes show up after the second download.</p>{% endif %}</div>
+    </section>
+
+
+    <section class="card" aria-labelledby="h-lic">
+      <div class="card-head"><h2 id="h-lic">Licences in your index</h2><a class="small" href="/about#licences">What they mean</a></div>
+      <div class="card-body"><table class="licence-table">
+        {% for cls, words in [('permissive', 'BSD, MIT, CC0, CC-BY, Apache'), ('copyleft', 'GPL, CC-BY-SA'), ('restricted', 'NC licences: your sensors, never shared'), ('none', 'no licence stated')] if lic_counts.get(cls) %}
+        <tr><td>{{ lic_class(cls) }}</td><td class="small">{{ lic_names.get(cls, [])|join(', ') or words }}</td><td class="num"><a href="/search?q=licence:{{ cls }}">{{ lic_counts[cls]|num }}</a></td></tr>
+        {% endfor %}
+      </table></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" aria-labelledby="h-sets">
+      <div class="card-head"><h2 id="h-sets">Your rulesets</h2><a class="small" href="/profiles">Manage profiles</a></div>
+      <div class="card-body">{% if cards %}<ul class="rulesets">
+        {% for c in cards %}{% set t, b = c.t, c.b %}
+        <li class="ruleset"><span class="name">{{ t.name }}{% if t.engine %} <span class="badge badge-outline">{{ t.engine|eng_label }} only</span>{% endif %}</span>
+          {% if (t.options or {}).get('redistributable_only') %}{{ lic('shareable', 'permissive') }}{% elif t.engine %}{{ eng(t.engine, [t.engine], []) }}{% else %}<span class="engs">{% for e in engines %}<span class="badge eng eng-ok" title="loads in {{ e.name|eng_label }}"><b>{{ e.short }}</b>&#10003;</span>{% endfor %}</span>{% endif %}
+          {% if b %}
+          <span class="meta"><span><b>{{ b.rules|num }}</b> rules</span><span>build #{{ b.id }} &middot; {{ when(b.created_at) }}</span><span>{{ c.n_excl }} exclusion{{ 's' if c.n_excl != 1 }}</span>{% if b.summary.previous_build %}<span><b>+{{ b.summary.added|num }}</b> &minus;{{ b.summary.removed|num }} since #{{ b.summary.previous_build }}</span>{% endif %}</span>
+          <span class="acts"><a class="btn {{ 'btn-primary' if loop.first }} btn-sm" href="/profiles/{{ t.name }}/builds/{{ b.id }}/suricata.rules">{{ icon('export') }}suricata.rules</a>
+            <button type="button" class="btn btn-sm js-only" data-action="copy" data-target="#feed-{{ loop.index }}">{{ icon('link') }}Copy suricata-update URL</button>
+            {% if c.new %}<a class="btn btn-quiet btn-sm" href="/profiles/{{ t.name }}/new">Review {{ c.new|num }} new</a>{% elif b.summary.previous_build %}<a class="btn btn-quiet btn-sm" href="/builds?profile={{ t.name }}">Diff with #{{ b.summary.previous_build }}</a>{% endif %}</span>
+          <code id="feed-{{ loop.index }}" hidden>{{ c.feed }}</code>
+          {% else %}
+          <span class="meta"><span>No build yet</span><span>{{ c.n_excl }} exclusions</span></span>
+          <span class="acts"><form action="/profiles/{{ t.name }}/build" method="post">{{ token() }}<button class="btn btn-primary btn-sm" type="submit"{% if running %} disabled{% endif %}>{{ icon('builds') }}Build now</button></form></span>
+          {% endif %}</li>
+        {% endfor %}
+      </ul>{% else %}<p class="small mb-0">No profile yet. A profile is a named ruleset (which rules, which engine, what to leave out):</p><div class="cmd"><code id="c-prof">suriharvest profile create default</code>{{ copy_btn('#c-prof') }}</div>{% endif %}</div>
+    </section>
+
+    <section class="card" aria-labelledby="h-sources">
+      <div class="card-head"><h2 id="h-sources">Top sources</h2><a class="small" href="/sources">All {{ st.n_sources }}</a></div>
+      <div class="card-body"><ul class="bars">{% for name, n in canon %}{% set src = srcs.get(name) %}
+        <li><span><a href="/sources/{{ name }}">{{ name }}</a> {% set l = src_lic(src) %}{{ lic(l[0], l[1]) }}</span><span class="n">{{ n|num }} unique</span><span class="bar"><span class="{{ n|wcls(src_top) }}"></span></span></li>
+      {% endfor %}</ul></div>
+      <div class="card-foot">Unique = rules counted once, under the highest-priority source that carries them.{% if st.failing %} {{ st.failing|length }} failing: {% for name, err in st.failing %}<a href="/sources/{{ name }}">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %} (old rules kept).{% endif %}</div>
+    </section>
+
+    {% if starts %}
+    <section class="card" aria-labelledby="h-start">
+      <div class="card-head"><h2 id="h-start">Common starting points</h2></div>
+      <div class="card-body"><ul class="rel-list">{% for label, q, n in starts %}<li><a href="/search?q={{ q|urlencode }}">{{ label }}</a><span class="muted xs">{{ n|num }}</span></li>{% endfor %}</ul></div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

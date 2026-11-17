@@ -1,0 +1,25 @@
+# Weekly, grouped update PRs. Actions stay pinned by full commit SHA; Dependabot rewrites the SHA and the
+# `# vX.Y.Z` comment next to it (keep that comment the exact tag). The uv version passed to setup-uv
+# (`version:`) is not tracked: bump it by hand together with setup-uv, to a version that release knows.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: uv # pyproject.toml + uv.lock
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ['*']
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7

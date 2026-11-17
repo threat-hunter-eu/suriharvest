@@ -1,0 +1,98 @@
+name: Publish to PyPI
+
+# Trusted publishing (OIDC): no API token is stored anywhere. Runs when a GitHub release is published, and only
+# when the repository variable SURIHARVEST_PYPI_ENABLED is 'true'. One-time setup (owner): on pypi.org add a
+# "pending publisher" for project `suriharvest` with this repository, workflow `publish.yml` and environment
+# `pypi`; create the `pypi` environment here, then set the variable. Release tags are `vX.Y.Z` and must match
+# `version` in pyproject.toml. The nightly ruleset releases (`rules-YYYY-MM-DD`) never publish a package.
+#
+# The `pypi` environment (Settings -> Environments -> New environment `pypi`) must exist BEFORE the first run,
+# otherwise GitHub creates it on first use with no protection:
+#   - Required reviewers: the owner (and "Prevent self-review" once there are other maintainers);
+#   - Deployment branches and tags: "Selected branches and tags", one TAG rule `v*` (no branch rules);
+#   - no secrets (OIDC only). See docs/automation.md#pypi.
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      vars.SURIHARVEST_PYPI_ENABLED == 'true' &&
+      startsWith(github.event.release.tag_name, 'v') &&
+      !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # all branches: the tagged commit must be on main (next step)
+          persist-credentials: false
+      # A tag can point at any commit (another branch, an unmerged PR head): only commits already on main publish.
+      - name: Tagged commit is on main
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::release commit $GITHUB_SHA is not on main; refusing to publish"
+            exit 1
+          fi
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+          enable-cache: false # never restore a cache another workflow wrote into a release build (cache poisoning)
+      - name: Tag matches the package version and a dated CHANGELOG section
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          [ "$TAG" = "v$version" ] || { echo "::error::release tag $TAG does not match pyproject version $version"; exit 1; }
+          grep -qE "^## \[${version//./\\.}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\s*$" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no dated '## [$version] - YYYY-MM-DD' section (still Unreleased?)"; exit 1; }
+      - run: uv sync --locked
+      - run: uv run pytest -q -m "not engine and not network"
+      # README images are relative paths on GitHub; the PyPI page needs absolute URLs (docs/conventions.md).
+      - name: README with absolute URLs for PyPI
+        run: python3 scripts/pypi_readme.py
+      # --no-sources: build exactly what an index install would resolve, ignoring any [tool.uv.sources] overrides.
+      - run: uv build --no-sources
+      - name: Wheel carries the catalog and installs cleanly
+        run: |
+          set -euo pipefail
+          unzip -l dist/*.whl | grep -q 'suriharvest/catalog/sources.yaml'
+          # Dependencies at the locked versions only: nothing newer from PyPI runs in the job that uploads dist/.
+          uv export --locked --no-dev --no-hashes --no-emit-project > "$RUNNER_TEMP/constraints.txt"
+          uv venv "$RUNNER_TEMP/clean" && uv pip install --python "$RUNNER_TEMP/clean/bin/python" -c "$RUNNER_TEMP/constraints.txt" dist/*.whl
+          "$RUNNER_TEMP/clean/bin/suriharvest" version
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: # protected: required reviewers + tag rule v* (see the header)
+      name: pypi
+      url: https://pypi.org/project/suriharvest/
+    permissions:
+      id-token: write # OIDC token for trusted publishing; nothing else
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

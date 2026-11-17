@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, when %}
+{% block title %}Jobs & health{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Jobs &amp; health</h1><p class="lede">Work started from this browser, and the state of the workspace.</p></div>
+</div>
+<div class="dash">
+  <div class="stack">
+    <section class="card"><div class="card-head"><h2>Jobs</h2><span class="xs muted">kept while the server runs</span></div>
+      <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Job</th><th scope="col">Started</th><th scope="col">Status</th></tr></thead><tbody>
+      {% for j in recent %}<tr><td><a href="/jobs/{{ j.id }}">{{ j.title }}</a></td><td class="small">{{ j.started.strftime('%H:%M:%S') }}</td><td><span class="badge {{ {'done': 'val-valid', 'failed': 'val-invalid', 'running': 'val-warnings'}.get(j.status, '') }}">{{ j.status }}</span></td></tr>
+      {% else %}<tr><td colspan="3" class="muted">No job since the server started. Downloads and builds started from Overview, Sources or Profiles show up here.</td></tr>{% endfor %}
+      </tbody></table></div></section>
+  </div>
+  <div class="stack">
+    <section class="card side-card"><div class="card-head"><h2>Health</h2></div><div class="card-body"><dl class="kv">
+      <dt>Database schema</dt><dd>{{ schema }} {% if schema == head %}<span class="badge val-valid">current</span>{% else %}<span class="badge val-invalid">behind {{ head }}: run suriharvest doctor</span>{% endif %}</dd>
+      <dt>Index built</dt><dd>{% if indexed %}{{ when(indexed) }}{% else %}never{% endif %}</dd>
+      <dt>Engines</dt><dd>{% for e in engines %}<b>{{ e.name }}</b> <span class="muted xs">{{ e.image or e.binary }}{% if versions.get(e.name) %} &middot; {{ versions[e.name] }}{% else %} &middot; not run yet{% endif %}</span>{% if not loop.last %}<br>{% endif %}{% else %}none configured{% endfor %}</dd>
+      <dt>Workspace</dt><dd class="mono xs">{{ workspace }}</dd>
+    </dl></div></section>
+    <section class="card side-card"><div class="card-head"><h2>See also</h2></div><div class="card-body small">Failed downloads and quarantined lines are on each <a href="/sources">source</a>'s page; update runs are under <a href="/builds#runs">Builds &amp; changes</a>.</div></section>
+  </div>
+</div>
+{% endblock %}

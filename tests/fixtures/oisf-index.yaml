@@ -1,0 +1,128 @@
+# Free entries of the OISF suricata-update index (openinfosecfoundation.org/rules/index.yaml), 2026-11-14.
+# Commercial entries (secret-code parameters) are left out of this fixture.
+sources:
+  abuse.ch/feodotracker:
+    license: CC0-1.0
+    summary: Abuse.ch Feodo Tracker Botnet C2 IP ruleset
+    url: https://feodotracker.abuse.ch/downloads/feodotracker.tar.gz
+    vendor: Abuse.ch
+  abuse.ch/sslbl-blacklist:
+    license: CC0-1.0
+    summary: Abuse.ch SSL Blacklist
+    url: https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.tar.gz
+    vendor: Abuse.ch
+  abuse.ch/sslbl-c2:
+    deprecated: Deprecated by source on 2025-01-03.
+    license: CC0-1.0
+    summary: Abuse.ch Suricata Botnet C2 IP Ruleset
+    url: https://sslbl.abuse.ch/blacklist/sslipblacklist.tar.gz
+    vendor: Abuse.ch
+  abuse.ch/sslbl-ja3:
+    license: CC0-1.0
+    min-version: 4.1.0
+    summary: Abuse.ch Suricata JA3 Fingerprint Ruleset
+    url: https://sslbl.abuse.ch/blacklist/ja3_fingerprints.tar.gz
+    vendor: Abuse.ch
+  abuse.ch/urlhaus:
+    license: CC0-1.0
+    summary: Abuse.ch URLhaus Suricata Rules
+    url: https://urlhaus.abuse.ch/downloads/urlhaus_suricata.tar.gz
+    vendor: abuse.ch
+  aleksibovellan/nmap:
+    license: MIT
+    min-version: 7.0.4
+    summary: Suricata IDS/IPS Detection Rules Against NMAP Scans
+    url: https://raw.githubusercontent.com/aleksibovellan/opnsense-suricata-nmaps/main/local.rules
+    vendor: aleksibovellan
+  echap/stalkerware:
+    license: CC-BY-4.0
+    min-version: 8.0.0
+    summary: Echap ruleset to identify stalkerware
+    url: https://raw.githubusercontent.com/AssoEchap/stalkerware-indicators/master/generated/suricata.rules
+    vendor: Echap
+  et/open:
+    license: MIT
+    summary: Emerging Threats Open Ruleset
+    url: https://rules.emergingthreats.net/open/suricata-%(__version__)s/emerging.rules.tar.gz
+    vendor: Proofpoint
+  etnetera/aggressive:
+    license: MIT
+    min-version: 4.0.0
+    summary: Etnetera aggressive IP blacklist
+    url: https://security.etnetera.cz/feeds/etn_aggressive.rules
+    vendor: Etnetera a.s.
+  ipfire/dbl:
+    license: CC-BY-SA-4.0
+    min-version: 8.0.0
+    summary: IPFire DBL
+    url: https://dbl.ipfire.org/lists/suricata.tar.gz
+    vendor: IPFire
+  julioliraup/antiphishing:
+    license: GPL-3.0
+    min-version: 7.0.0
+    summary: Antiphishing for protection against phishing attacks
+    url: https://raw.githubusercontent.com/julioliraup/Antiphishing/refs/heads/main/antiphishing.tar.gz
+    vendor: julioliraup
+  malsilo/win-malware:
+    license: MIT
+    min-version: 4.1.0
+    obsolete: unmaintained
+    summary: Commodity malware rules
+    url: https://malsilo.gitlab.io/feeds/dumps/malsilo.rules.tar.gz
+    vendor: malsilo
+  oisf/trafficid:
+    license: MIT
+    min-version: 4.0.0
+    summary: Suricata Traffic ID ruleset
+    url: https://openinfosecfoundation.org/rules/trafficid/trafficid.rules
+    vendor: OISF
+  pawpatrules:
+    license: CC-BY-SA-4.0
+    min-version: 7.0.3
+    summary: PAW Patrules is a collection of rules for IDPS / NSM Suricata engine
+    url: https://rules.pawpatrules.fr/suricata/paw-patrules.tar.gz
+    vendor: pawpatrules
+  ptresearch/attackdetection:
+    license: Custom
+    obsolete: no longer exists
+    summary: Positive Technologies Attack Detection Team ruleset
+    url: https://raw.githubusercontent.com/ptresearch/AttackDetection/master/pt.rules.tar.gz
+    vendor: Positive Technologies
+  ptrules/open:
+    license: MIT
+    min-version: 5.0.0
+    summary: Positive Technologies Open Ruleset
+    url: https://ptrules.com/files/ptopen.rules.tar.gz
+    vendor: Positive Technologies
+  sslbl/ja3-fingerprints:
+    deprecated: Renamed to abuse.ch/sslbl-ja3
+    license: CC0-1.0
+    min-version: 4.1.0
+    summary: Abuse.ch Suricata JA3 Fingerprint Ruleset
+    url: https://sslbl.abuse.ch/blacklist/ja3_fingerprints.tar.gz
+    vendor: Abuse.ch
+  sslbl/ssl-fp-blacklist:
+    deprecated: Renamed to abuse.ch/sslbl-blacklist
+    license: CC0-1.0
+    summary: Abuse.ch SSL Blacklist
+    url: https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.tar.gz
+    vendor: Abuse.ch
+  stamus/lateral:
+    license: GPL-3.0-only
+    min-version: 6.0.6
+    summary: Lateral movement rules
+    url: https://ti.stamus-networks.io/open/stamus-lateral-rules.tar.gz
+    vendor: Stamus Networks
+  tgreen/hunting:
+    license: GPLv3
+    min-version: 7.0.3
+    summary: Threat hunting rules
+    url: https://github.com/travisbgreen/hunting-rules/raw/master/hunting.rules.tar.gz
+    vendor: tgreen
+  the-hunters-ledger/open:
+    license: CC-BY-4.0
+    min-version: 8.0.0
+    summary: The Hunters Ledger threat-intelligence detection feed
+    url: https://the-hunters-ledger.com/feeds/suricata/hunters-ledger.rules
+    vendor: The Hunters Ledger
+version: 1

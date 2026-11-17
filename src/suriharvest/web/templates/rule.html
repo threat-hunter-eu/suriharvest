@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, sev, lic, engs, when, token, crumbs %}
+{% block title %}{{ g.msg or g.sid }}{% endblock %}
+{% block content %}
+{{ crumbs([('Search', '/search'), (g.app_layer, '/search?q=app:' ~ g.app_layer)] + ([(g.classtype, '/search?q=classtype:' ~ g.classtype|urlencode)] if g.classtype else []) + [('sid ' ~ g.sid, none)]) }}
+<div class="page-head rule-head">
+  <div><h1>{{ g.msg or "(no msg)" }}</h1>
+    <div class="badges">{{ sev(g.severity) }}<span class="badge badge-outline mono" title="gid:sid and revision">{{ g.gid }}:{{ g.sid }}{% if g.rev %} rev {{ g.rev }}{% endif %}</span>{{ lic(rlic[0], rlic[1]) }}{{ engs(engines, g.loads_in, g.fails_in) }}
+      {% for c in cves[:4] %}<a class="badge kw" href="/search?q=cve:{{ c }}">{{ c }}</a>{% endfor %}
+      <span class="badge badge-outline" title="identical or equivalent copies merged into this entry">{{ icon('merge') }}{{ g.copies }} cop{{ 'ies' if g.copies != 1 else 'y' }} &middot; {{ g.sources|length }} source{{ 's' if g.sources|length != 1 }}</span>
+      {% if g.is_ioc %}<span class="badge ioc">IOC &middot; {{ IOC_WORDS.get(g.ioc_type, g.ioc_type) }}</span>{% endif %}
+      {% if key and key.ambiguous %}<span class="badge flag-bad" title="{{ key.n_clusters }} unrelated rules use this sid">ambiguous sid</span>{% endif %}
+      {% if not g.enabled_anywhere %}<span class="badge badge-outline" title="every source ships it commented out">disabled upstream</span>{% endif %}
+      {% if 'deprecated' in g.flags %}<span class="badge flag-warn">deprecated</span>{% endif %}{% if 'retired' in g.flags %}<span class="badge flag-warn">retired by the publisher</span>{% endif %}
+      {% if g.junk %}<span class="badge flag-bad">not Suricata syntax</span>{% endif %}</div></div>
+  <div class="actions"><button type="button" class="btn js-only" data-action="copy" data-target="#rule-one">{{ icon('copy') }}Copy rule</button><a class="btn" href="/export/download?h={{ g.logic_hash }}">{{ icon('file') }}Download .rules</a><a class="btn btn-primary" href="/export?h={{ g.logic_hash }}">{{ icon('export') }}Export&hellip;</a></div>
+</div>
+
+<div class="rule-layout">
+  <div>
+    <section class="summary" aria-label="In plain words">
+      <p class="plain">{{ summary.plain }}</p>
+      {% if summary.traffic %}{% set tr = summary.traffic %}
+      <div class="traffic" aria-label="Traffic this rule looks at: from {{ tr.left.label }} to {{ tr.right.label }}, {{ tr.wire }}">
+        <div class="end"><b>{{ tr.left.label }}</b><code>{{ tr.left.addr }}</code><span class="xs muted">{{ tr.left.role }}</span></div>
+        <div class="wire{% if tr.both %} both{% endif %}"><span>{{ tr.wire }}</span><small>{{ tr.note }}</small></div>
+        <div class="end"><b>{{ tr.right.label }}</b><code>{{ tr.right.addr }}</code><span class="xs muted">{{ tr.right.role }}</span></div>
+      </div>
+      {% endif %}
+      {% if summary.steps %}<ol class="match-steps">{% for st_ in summary.steps %}<li{% if st_.gate %} class="gate"{% endif %}><span>{{ st_.html }}</span></li>{% endfor %}</ol>{% endif %}
+      <dl class="facts mt-6">
+        <div><dt>Detects</dt><dd>{% if cves %}{% for c in cves[:3] %}<a href="/search?q=cve:{{ c }}">{{ c }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% elif g.ioc_value %}<span class="mono">{{ g.ioc_value[:48] }}</span>{% else %}{{ g.category or g.app_layer }}{% endif %}
+          {% if meta.get('affected_product') %}<span class="sub">{{ meta.affected_product|join(', ')|replace('_', ' ') }}</span>{% endif %}
+          {% if meta.get('malware_family') %}<span class="sub">malware family <a href="/search?q=metadata:malware_family={{ meta.malware_family[0]|urlencode }}">{{ meta.malware_family[0]|replace('_', ' ') }}</a></span>{% endif %}
+          {% if g.mitre %}<span class="tag-list mt-2">{% for m in g.mitre[:4] %}<a class="badge tech" href="/search?q=mitre:{{ m }}">{{ m }}</a>{% endfor %}</span>{% endif %}</dd></div>
+        <div><dt>Class</dt><dd>{% if g.classtype %}<span class="mono">{{ g.classtype }}</span>{% set ct = CLASSTYPES.get(g.classtype) %}{% if ct %}<span class="sub">{{ ct[0] }} (priority {{ ct[1] }})</span>{% endif %}{% else %}<span class="muted">no classtype</span>{% endif %}
+          {% if g.confidence or meta.get('deployment') %}<span class="sub">{% if g.confidence %}confidence {{ g.confidence }}{% endif %}{% if g.confidence and meta.get('deployment') %} &middot; {% endif %}{% if meta.get('deployment') %}deployment {{ meta.deployment|join(', ') }}{% endif %}</span>{% endif %}</dd></div>
+        <div><dt>Sid owner</dt><dd>{% if alloc %}{{ alloc.owner }}<span class="sub">range {{ alloc.first|num }}&ndash;{{ alloc.last|num }} (sidallocation.org) &middot; key <span class="mono">{{ g.rule_key }}</span></span>{% else %}{{ g.canonical_source }}<span class="sub">no allocated range: namespace of the source &middot; key <span class="mono">{{ g.rule_key }}</span></span>{% endif %}
+          {% if remap %}<span class="sub collision">{{ icon('alert') }}clashes with another rule: exported as {{ g.gid }}:{{ remap[1] }} (stable)</span>{% endif %}</dd></div>
+        {% set src = srcs.get(g.canonical_source) %}
+        <div><dt>Licence</dt><dd>{{ rlic[0] }} <span class="muted">({{ g.canonical_source }})</span><span class="sub">{% if rlic[1] == 'permissive' %}share it, keep the notice{% elif rlic[1] == 'copyleft' %}share it under the same licence{% elif rlic[1] == 'restricted' %}your own sensors only, never shared{% else %}no licence stated: do not redistribute{% endif %}</span></dd></div>
+      </dl>
+      {% if summary.needs %}<div class="needs">{{ icon('about') }}<p class="mb-0"><b>You need:</b> {% for n in summary.needs %}{{ n }}{% if not loop.last %}; {% endif %}{% endfor %}.{% if setters %} suriharvest exports flowbit setters together with the rules that need them; if you exclude a setter, this rule can never fire and the build warns you.{% endif %}</p></div>{% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="h-rule">
+      <div class="card-head"><h2 id="h-rule">Rule <span class="sub">canonical copy from {{ g.canonical_source }}{% if canonical %} &middot; <span class="mono">{{ canonical.path.split('/')[-1] }}:{{ canonical.line_no }}</span>{% endif %}</span></h2>
+        <div class="row"><span class="seg js-only" role="group" aria-label="Layout"><button type="button" aria-pressed="true" data-action="rule-layout" data-show="#rule-lines" data-hide="#rule-flat">One option per line</button><button type="button" aria-pressed="false" data-action="rule-layout" data-show="#rule-flat" data-hide="#rule-lines">As in the file</button></span>{{ '' }}<button type="button" class="btn btn-sm js-only" data-action="copy" data-target="#rule-one">{{ icon('copy') }}Copy</button><a class="btn btn-sm" href="/export/download?h={{ g.logic_hash }}">{{ icon('file') }}.rules</a></div></div>
+      <pre class="code rule-code" id="rule-lines">{{ v.raw|rule_html }}</pre>
+      <pre class="code rule-code" id="rule-flat" hidden>{{ v.raw|rule_html(false) }}</pre>
+      <pre id="rule-one" hidden>{{ v.raw }}</pre>
+    </section>
+
+    <section class="card" aria-labelledby="h-deps">
+      <div class="card-head"><h2 id="h-deps">Dependencies <span class="sub">flowbits, datasets, files</span></h2></div>
+      <div class="card-body"><ul class="deps">
+        {% for bit, cands in setters %}{% set nm = bit.split(':', 1)[1] %}
+        {% if cands %}{% set c0 = cands[0] %}
+        <li>{{ icon('check', 'ico ok') }}<span>Needs {{ bit.split(':')[0][:-1] }} <code>{{ nm }}</code>: set by <a href="/rule/{{ c0.logic_hash }}">sid {{ c0.sid }}</a> {{ c0.msg }}{% if cands|length > 1 %} <span class="muted">(and {{ cands|length - 1 }} more)</span>{% endif %}</span><span class="sub">{{ 'same source' if c0.canonical_source == g.canonical_source else 'from' }} ({{ c0.canonical_source }}){% if c0.loads_in %}, loads in {{ c0.loads_in|map('eng_short')|join(' and ') }}{% endif %}</span></li>
+        {% else %}
+        <li>{{ icon('x', 'ico miss') }}<span>Needs {{ bit.split(':')[0][:-1] }} <code>{{ nm }}</code>, and <b>no rule in the index sets it</b></span><span class="sub">this rule can never fire in your builds</span></li>
+        {% endif %}{% endfor %}
+        {% for bit, users in needed_by %}
+        <li>{{ icon('flow', 'ico ok') }}<span>Sets {{ bit.split(':')[0][:-1] }} <code>{{ bit.split(':', 1)[1] }}</code>{% if users %}, needed by {% for u in users %}<a href="/rule/{{ u.logic_hash }}">sid {{ u.sid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}; no rule in the index checks it{% endif %}</span>{% if users %}<span class="sub">excluding this rule silences {{ users|length }}{{ '+' if users|length == 5 }} other rule{{ 's' if users|length != 1 }}</span>{% endif %}</li>
+        {% endfor %}
+        {% for f in v.files %}<li>{{ icon('file', 'ico miss') }}<span>Needs the file <code>{{ f }}</code> next to the rules</span><span class="sub">dataset, lua script or file list: not shipped by suriharvest</span></li>{% endfor %}
+        {% if not setters and not needed_by and not v.files %}<li>{{ icon('check', 'ico ok') }}<span>Uses no flowbit, dataset, lua script or file</span><span class="sub">it works on its own</span></li>{% endif %}
+      </ul></div>
+    </section>
+
+    {% if revs|length > 1 %}
+    <section class="card" aria-labelledby="h-rev">
+      <div class="card-head"><h2 id="h-rev">Revision history <span class="sub">{{ g.rule_key }}</span></h2></div>
+      <div class="card-body"><ul class="revs">
+        {% for r in revs %}<li{% if r.lh == g.logic_hash %} class="now"{% endif %}><span class="rv">{% if r.lh != g.logic_hash %}<a href="/rule/{{ r.lh }}">rev {{ r.rev }}</a>{% else %}rev {{ r.rev }}{% endif %}</span><span class="what">{{ r.what }}{% if not r.live %} <span class="muted xs">(no longer published)</span>{% endif %}</span><span class="xs muted">{{ r.first.strftime('%Y-%m-%d') }}</span></li>{% endfor %}
+      </ul></div>
+    </section>
+    {% endif %}
+
+    {% if family or similar or setters|selectattr(1)|list %}
+    <section class="card" aria-labelledby="h-rel">
+      <div class="card-head"><h2 id="h-rel">Related rules</h2></div>
+      <div class="card-body"><ul class="rel-list">
+        {% for bit, cands in setters %}{% for c in cands[:1] %}<li><span><a href="/rule/{{ c.logic_hash }}">{{ c.msg }}</a><span class="why">sets the flowbit this rule needs &middot; sid {{ c.sid }}</span></span><span class="sim">companion</span></li>{% endfor %}{% endfor %}
+        {% for f in family[:5] %}<li><span><a href="/rule/{{ f.logic_hash }}">{{ f.msg }}</a><span class="why">same family: another variant of this rule &middot; sid {{ f.sid }} &middot; {{ f.canonical_source }}</span></span><span class="sim">family</span></li>{% endfor %}
+        {% for f, j in similar %}<li><span><a href="/rule/{{ f.logic_hash }}">{{ f.msg }}</a><span class="why">most of the same contents on {{ f.app_layer }}, different detection &middot; sid {{ f.sid }}</span></span><span class="sim">{{ (j * 100)|round|int }}% overlap</span></li>{% endfor %}
+      </ul></div>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="stack" aria-label="About this rule">
+    <section class="card side-card">
+      <div class="card-head"><h2>Suricata check</h2><span class="xs muted">suricata -T</span></div>
+      <div class="card-body">{% if validation %}<dl class="kv">
+        {% for e, ver, stt, cat, err, at in validation %}
+        <dt>{{ engs([e], [e] if stt == 'ok' else [], [e] if stt != 'ok' else []) }}</dt><dd>{% if stt == 'ok' %}Loads in {{ ver.split()[0] }}{% else %}Does not load in {{ ver.split()[0] }}: {{ (cat or 'error')|replace('_', ' ') }}{% endif %} <span class="muted xs">checked {{ when(at) }}</span>
+          {% if err and stt != 'ok' %}<pre class="file-tree mt-2">{{ err[:400] }}</pre>{% endif %}</dd>
+        {% endfor %}
+      </dl>{% else %}<p class="mb-0 muted">Not checked yet: <code>suriharvest validate</code> runs <code class="nowrap">suricata -T</code> on new rules.</p>{% endif %}</div>
+    </section>
+    {% if profile_status %}
+    <section class="card side-card">
+      <div class="card-head"><h2>In your rulesets</h2></div>
+      <div class="card-body">
+        <ul class="deps">{% for name, state, ex in profile_status %}
+          {% if state == 'included' %}<li>{{ icon('check', 'ico ok') }}<span><a href="/profiles/{{ name }}/exclusions">{{ name }}</a>: included</span></li>
+          {% elif state == 'fails' %}<li>{{ icon('x', 'ico miss') }}<span><a href="/profiles/{{ name }}/exclusions">{{ name }}</a>: left out, does not load in its engine</span></li>
+          {% else %}<li>{{ icon('x', 'ico miss') }}<span><a href="/profiles/{{ name }}/exclusions">{{ name }}</a>: excluded by <code>{{ ex.kind }} {{ ex.value[:40] }}</code></span>{% if ex.reason %}<span class="sub">&ldquo;{{ ex.reason }}&rdquo; &middot; {{ ex.created_at.strftime('%Y-%m-%d') }}</span>{% endif %}</li>{% endif %}
+        {% endfor %}</ul>
+        {% for name, state, ex in profile_status if state == 'included' %}{% if loop.first %}
+        <form class="mt-4" action="/profiles/{{ name }}/exclusions" method="post">{{ token() }}<input type="hidden" name="kind" value="rule_key"><input type="hidden" name="value" value="{{ g.rule_key }}">
+          <label class="field">Exclude from {{ name }}<input name="reason" placeholder="Reason (optional)" aria-label="reason for excluding from {{ name }}"></label>
+          <button class="btn btn-sm mt-2" type="submit" title="exclude every revision of {{ g.rule_key }} from {{ name }}"{% if running %} disabled{% endif %}>{{ icon('filter') }}Exclude every revision of {{ g.gid }}:{{ g.sid }}</button></form>
+        {% endif %}{% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    <section class="card side-card">
+      <div class="card-head"><h2>Where it comes from</h2><span class="xs muted">{{ copies|length }} cop{{ 'ies' if copies|length != 1 else 'y' }} &middot; {{ copies|map(attribute='name')|unique|list|length }} source{{ 's' if copies|map(attribute='name')|unique|list|length != 1 }}</span></div>
+      <div class="card-body"><ul class="src-list">
+        {% for c in copies[:12] %}{% set l = rule_lic(srcs.get(c.name), c.msg) %}
+        <li><span><a href="/sources/{{ c.name }}"><b>{{ c.name }}</b></a> {% if v and c.content_hash == v.content_hash and c.name == g.canonical_source and loop.first %}<span class="canon">canonical</span>{% endif %}{% if not c.enabled %} <span class="muted xs">commented out</span>{% endif %}</span>{{ lic(l[0], l[1]) }}
+          <span class="path" title="{{ c.path }}:{{ c.line_no }}">{{ c.path }}:{{ c.line_no }} &middot; {% if v and c.content_hash == v.content_hash %}{{ 'identical' if not loop.first else 'rev ' ~ c.rev }}{% else %}equivalent variant, rev {{ c.rev }}{% endif %}</span></li>
+        {% endfor %}
+        {% if copies|length > 12 %}<li><span class="muted xs">and {{ copies|length - 12 }} more copies</span></li>{% endif %}
+      </ul></div>
+    </section>
+    <section class="card side-card">
+      <div class="card-head"><h2>Details</h2></div>
+      <div class="card-body"><dl class="kv">
+        <dt>Rule key</dt><dd class="mono">{{ g.rule_key }}</dd>
+        <dt>Logic hash</dt><dd class="mono" title="{{ g.logic_hash }}">{{ g.logic_hash[:12] }}</dd>
+        {% if meta.get('created_at') %}<dt>Created</dt><dd>{{ meta.created_at[0]|replace('_', '-') }}</dd>{% endif %}
+        {% if g.updated %}<dt>Updated</dt><dd>{{ g.updated }}{% if g.rev %} <span class="muted xs">(rev {{ g.rev }})</span>{% endif %}</dd>{% endif %}
+        {% if meta.get('affected_product') %}<dt>Product</dt><dd>{{ meta.affected_product|join(', ')|replace('_', ' ') }}</dd>{% endif %}
+        {% if meta.get('attack_target') %}<dt>Target</dt><dd>{{ meta.attack_target|join(', ')|replace('_', ' ') }}</dd>{% endif %}
+        {% if g.performance_impact %}<dt>Performance</dt><dd>{{ g.performance_impact }} impact</dd>{% endif %}
+        <dt>Syntax</dt><dd>{% for f in g.flags if f.startswith('dialect:') %}{{ {'suricata': 'Suricata only', 'both': 'Suricata and Snort', 'snort': 'Snort only (does not load in Suricata)'}[f[8:]] }}{% endfor %}</dd>
+        {% if refs %}<dt>References</dt><dd>{% for label, href in refs[:6] %}{% if href %}<a href="{{ href }}" rel="noreferrer noopener" target="_blank">{{ label }} {{ icon('external') }}</a>{% else %}<span class="mono xs">{{ label }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</dd>{% endif %}
+        <dt>Score</dt><dd title="{% for k, n in g.score_parts.items() %}{{ k }} {{ n }}; {% endfor %}">{{ g.score }} <span class="muted xs">ranking aid, not a verdict</span></dd>
+      </dl>
+      <details class="mt-4"><summary class="xs muted">Hashes</summary><dl class="kv mono xs mt-2"><dt>logic</dt><dd>{{ g.logic_hash }}</dd><dt>semantic</dt><dd>{{ g.semantic_hash or '-' }}</dd><dt>content</dt><dd>{{ v.content_hash }}</dd></dl></details></div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

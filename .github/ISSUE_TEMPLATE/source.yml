@@ -1,0 +1,38 @@
+name: Suggest a source
+description: A free Suricata ruleset the catalog should know about.
+labels: [catalog]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: Download URL or Git repository
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence (SPDX id if possible) and a link to the publisher's own licence text
+    validations:
+      required: true
+  - type: dropdown
+    id: redistribute
+    attributes:
+      label: Does the licence allow republishing the rules?
+      options: ["yes", "no", "unclear"]
+    validations:
+      required: true
+  - type: input
+    id: sids
+    attributes:
+      label: sid range (and its sidallocation.org entry, if any)
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: The rules load with `suricata -T` on Suricata 7 and/or 8 (say which in the notes)
+        - label: No personal key, subscription or commercial licence is needed
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (update frequency, rule count, what it detects)

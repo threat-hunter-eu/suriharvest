@@ -1,0 +1,17 @@
+name: Rule feedback (false positive, does not load, duplicate)
+description: Tell other users that a rule is noisy, does not load, is a duplicate or is mis-categorised
+labels: [rule-feedback]
+body:
+  - type: input
+    id: key
+    attributes: {label: Rule, description: "sid, rule key (namespace:gid:sid) or logic hash (first 10+ characters), as shown by suriharvest"}
+    validations: {required: true}
+  - type: dropdown
+    id: reason
+    attributes:
+      label: Problem
+      options: [noisy / false positives, does not load in Suricata, duplicate, wrong category or severity, other]
+    validations: {required: true}
+  - type: textarea
+    id: evidence
+    attributes: {label: Evidence, description: "Suricata version, sample traffic or alert (redacted), how often it fires. Rule issues that belong upstream should also be reported to the rule's publisher."}

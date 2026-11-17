@@ -1,0 +1,136 @@
+name: Pages (static site)
+
+# Optional. Disabled until the repo variable SURIHARVEST_PAGES_ENABLED is 'true' and Settings -> Pages -> Source is
+# "GitHub Actions". The site is built from release files only (never from the workspace): per-build counts, diff,
+# per-source and per-engine tables, top validation errors, download links, and a client-side search over a small
+# metadata index (msg, sid, source, licence, loads_on). No rule text of user-fetch sources is ever shown.
+
+on:
+  workflow_call: # from nightly.yml after a release is published (GITHUB_TOKEN releases do not fire `release:`)
+    inputs:
+      tag:
+        description: Release tag to build the site from.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (empty = latest rules-* release).
+        type: string
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'src/suriharvest/site/**'
+      - '.github/workflows/pages.yml'
+
+permissions: {}
+
+concurrency:
+  group: suriharvest-pages
+  cancel-in-progress: false
+
+jobs:
+  # Off once the rulesets live in a rules repository (SURIHARVEST_RULES_REPO): the site is deployed from there.
+  build:
+    if: >-
+      vars.SURIHARVEST_AUTOMATION_ENABLED == 'true' && vars.SURIHARVEST_PAGES_ENABLED == 'true' &&
+      (vars.SURIHARVEST_RULES_REPO == '' || vars.SURIHARVEST_RULES_REPO == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      # A Pages site is public even for a private repository (outside Enterprise private Pages): deploy only when the
+      # API says the repository is public. Any error or a private repository stops here (fail-closed).
+      - name: Repository visibility (fail-closed)
+        run: |
+          set -uo pipefail
+          if private=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private' 2>/dev/null) && [ "$private" = "false" ]; then
+            echo "repository is public"
+          else
+            echo "::error::repository not verified public (API private=${private:-<error>}): no Pages deploy"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+          enable-cache: false # deploy job: no cache restored from other runs
+
+      - run: uv sync --locked --no-dev
+
+      - name: Download release files (metadata only; rules stay downloads from the release)
+        id: rel
+        run: |
+          set -euo pipefail
+          tag="${TAG:-}"
+          if [ -z "$tag" ]; then
+            tag=$(gh release list --limit 100 --exclude-drafts --json tagName \
+                  --jq '[.[] | select(.tagName | startswith("rules-"))][0].tagName // ""')
+          fi
+          [ -n "$tag" ] || { echo "::error::no rules-* release to build from"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          gh release download "$tag" -D rel -p summary.json -p manifest.jsonl.gz -p changes.json \
+            -p validation.json -p collisions.json -p NOTICE.md -p index.yaml -p SHA256SUMS
+          (cd rel && sha256sum --check --ignore-missing SHA256SUMS)
+          # Release time, not build time: identical input -> identical site.
+          echo "epoch=$(date -u -d "$(jq -r .generated_at rel/summary.json)" +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Read Pages configuration (fails clearly if Pages is not enabled)
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: false
+
+      - name: Build site
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          ORIGIN: ${{ steps.pages.outputs.origin }}
+          BUILD_EPOCH: ${{ steps.rel.outputs.epoch }}
+          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          uv run suriharvest site build _site \
+            --release rel \
+            --tag "$RELEASE_TAG" \
+            --download-base "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}" \
+            --base-url "${BASE_PATH%/}/" \
+            --site-url "$ORIGIN" \
+            --build-epoch "$BUILD_EPOCH"
+          du -sh _site
+          echo "files: $(find _site -type f | wc -l)"
+          # GitHub Pages: a published site may not exceed 1 GB; stop well before it.
+          bytes=$(du -sb _site | cut -f1)
+          [ "$bytes" -le 900000000 ] || { echo "::error::_site is $bytes bytes, over the 900 MB guard (Pages limit 1 GB)"; exit 1; }
+          big=$(find _site -type f -size +95M)
+          [ -z "$big" ] || { echo "::error::files over the 100 MB Pages limit: $big"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+          include-hidden-files: true # .well-known/security.txt (RFC 9116)
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

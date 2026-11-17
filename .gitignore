@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+# workspaces (downloaded rules, database, builds) never belong in the repository
+/workspace/
+/.ws/
+/.out/
+data/
+corpus/
+reports/
+exclusions/
+/sources.yaml
+/suriharvest.yaml
+*.db
+# state/sid-map.tsv at the repository root is committed on purpose (nightly: stable sids across releases)

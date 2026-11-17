@@ -1,0 +1,79 @@
+{% from "_ui.html" import icon, when %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c110f" media="(prefers-color-scheme: dark)">
+<meta name="csrf-token" content="{{ csrf }}">
+<title>{% block title %}suriharvest{% endblock %} - suriharvest</title>
+<script src="/static/theme.js"></script>
+<link rel="preload" href="/static/fonts/AtkinsonHyperlegibleNext.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Archivo-Display.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/AtkinsonHyperlegibleMono.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/harvest-base.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="side" aria-label="Main">
+    <a class="brand" href="/"><span class="brand-mark">{{ icon('harvest') }}</span><span>suriharvest<small>Suricata rule index</small></span></a>
+    <ul class="nav">
+      {% for key, href, ico, label in [
+        ('overview', '/', 'overview', 'Overview'),
+        ('search', '/search', 'search', 'Search'),
+        ('sources', '/sources', 'sources', 'Sources'),
+        ('builds', '/builds', 'changes', 'Builds & changes'),
+        ('profiles', '/profiles', 'profiles', 'Profiles & exclusions'),
+        ('export', '/export', 'export', 'Export'),
+        ('about', '/about', 'about', 'About & licences')] %}
+      <li><a href="{{ href }}"{% if section == key %} aria-current="page"{% endif %}>{{ icon(ico) }}<span>{{ label }}</span>{% if key == 'builds' and st.new_badge %}<span class="dot" title="{{ st.new_badge|num }} rules would be new in {{ st.first_profile }} since its last build">{{ st.new_badge|num }}</span>{% endif %}</a></li>
+      {% endfor %}
+    </ul>
+    <p class="side-status">
+      {% if running %}<span class="pulse pulse-run" aria-hidden="true"></span>Running: <a href="/jobs/{{ running.id }}">{{ running.title }}</a><br>{% endif %}
+      {% if st.empty %}Not updated yet{% else %}<span class="pulse" aria-hidden="true"></span>Updated {{ when(st.indexed) }}<br>{{ st.n_sources|num }} source{{ 's' if st.n_sources != 1 }} &middot; {{ st.n_rules|num }} rules{% endif %}
+      {% for e, short, ver, at in st.engines if ver %}{% if loop.first %}<br>Checked on {% endif %}Suricata {{ ver }}{% if not loop.last %} and {% endif %}{% endfor %}
+    </p>
+    <ul class="nav nav-foot">
+      <li><a href="/jobs" title="Jobs &amp; health"{% if section == 'jobs' %} aria-current="page"{% endif %}>{{ icon('terminal') }}<span>Jobs &amp; health</span></a></li>
+      <li><button type="button" class="js-only" data-action="shortcuts" title="Keyboard shortcuts (?)">{{ icon('keyboard') }}<span>Shortcuts</span><kbd>?</kbd></button></li>
+      <li><button type="button" class="js-only" data-action="theme" aria-label="Switch colour theme" title="Switch colour theme (t)">{{ icon('theme') }}<span data-theme-label>Theme: auto</span></button></li>
+    </ul>
+  </nav>
+  <div class="frame">
+    <header class="topbar">
+      {% if section == 'search' and not st.empty %}<p class="muted small mb-0 js-only">Tip: press <kbd>/</kbd> to search, <kbd>?</kbd> for shortcuts</p>
+      {% else %}<form class="searchbar" action="/search" method="get" role="search">{{ icon('search') }}
+        <input type="search" name="q" id="global-search" autocomplete="off" spellcheck="false" placeholder="Search rules: cobalt strike, sid:2050297, cve:CVE-2024-3400, app:tls, classtype:trojan-activity" aria-label="Search rules">
+        <kbd class="js-only" aria-hidden="true">/</kbd>
+      </form>{% endif %}
+      <div class="topbar-end"><a class="btn btn-quiet btn-sm" href="{{ repo_url }}" rel="noopener noreferrer">{{ icon('external') }}GitHub</a></div>
+    </header>
+    <main id="main" class="page" tabindex="-1">
+      {% if running and section not in ('jobs',) and not (job is defined) %}<div class="notice" role="status">{{ icon('refresh') }}<p><b>Running:</b> <a href="/jobs/{{ running.id }}">{{ running.title }}</a>. Buttons that change rules are off until it finishes.</p></div>{% endif %}
+      {% if st.empty and section not in ('about', 'jobs') and not (job is defined) and not (status is defined) %}{% include "onboarding.html" %}{% else %}{% block content %}{% endblock %}{% endif %}
+    </main>
+  </div>
+</div>
+<dialog id="shortcuts" aria-labelledby="shortcuts-title">
+  <div class="card-head"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button type="button" class="btn btn-quiet btn-sm" data-action="close-dialog">Close</button></div>
+  <div class="card-body keys"><dl>
+    <dt><kbd>/</kbd></dt><dd>Focus search</dd>
+    <dt><kbd>g</kbd> <kbd>o</kbd> / <kbd>s</kbd> / <kbd>b</kbd> / <kbd>p</kbd> / <kbd>e</kbd></dt><dd>Go to Overview, Search, Builds, Profiles, Export</dd>
+    <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next / previous result</dd>
+    <dt><kbd>Enter</kbd></dt><dd>Open the focused rule</dd>
+    <dt><kbd>x</kbd></dt><dd>Select the focused rule (<kbd>Shift</kbd>+<kbd>x</kbd>: whole page)</dd>
+    <dt><kbd>e</kbd></dt><dd>Export the selection (or this rule)</dd>
+    <dt><kbd>y</kbd></dt><dd>Copy the rule text (on a rule page)</dd>
+    <dt><kbd>t</kbd></dt><dd>Switch the colour theme</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Leave the search box, close dialogs, clear the selection</dd>
+  </dl></div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

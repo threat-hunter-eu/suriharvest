@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, lic_class, when, token, copy_btn %}
+{% block title %}Export{% endblock %}
+{% block content %}
+{% set keepq = {'q': q} if scope == 'search' else {} %}
+<div class="page-head">
+  <div><h1>Export</h1><p class="lede">Get a ruleset in the shape your sensors need. Rules that do not load in the chosen Suricata are left out, sid clashes are fixed, licences travel with the file.</p></div>
+</div>
+{% if error %}<div class="notice notice-warn">{{ icon('alert') }}<p>The search could not be read: {{ error }}</p></div>{% endif %}
+
+{% if not profiles and scope == 'profile' %}
+<div class="card"><div class="empty"><h2>Nothing to export yet</h2><p>Export works on a profile (a named ruleset) or on a search. Create a profile, or <a href="/search">search</a> and export the result.</p><div class="cmd"><code id="c-pc">suriharvest profile create default</code>{{ copy_btn('#c-pc') }}</div></div></div>
+{% else %}
+<div class="export-layout">
+  <form class="stack" action="/export" method="get" data-autosubmit-form>
+    {% if scope == 'profile' and t %}<input type="hidden" name="profile" value="{{ t.name }}">{% elif scope == 'search' %}<input type="hidden" name="q" value="{{ q }}">{% else %}{% for x in h %}<input type="hidden" name="h" value="{{ x }}">{% endfor %}{% endif %}
+    <input type="hidden" name="engine" value="{{ engine }}">
+    <section class="card"><div class="card-body">
+      <div class="spread"><div><b>What to export</b><p class="small muted mb-0">
+        {% if scope == 'profile' and t %}Profile <b>{{ t.name }}</b>: {% if t.query %}<span class="mono">{{ t.query }}</span>{% else %}every rule{% endif %} minus its exclusions{% if b %}, build #{{ b.id }} from {{ when(b.created_at) }}{% else %}; no build yet{% endif %}
+        {% elif scope == 'search' %}The search <span class="mono">{{ q }}</span>: {{ total|num }} rules
+        {% else %}{{ n_selected|num }} rule{{ 's' if n_selected != 1 }} you picked{% endif %}</p></div>
+        <span class="seg" role="group" aria-label="Scope">{% for c in cards %}<a href="/export?{{ urlencode({'profile': c.t.name, 'format': fmt}) }}" aria-current="{{ 'true' if scope == 'profile' and t and c.t.name == t.name else 'false' }}">{{ 'Profile ' if loop.first }}{{ c.t.name }}{% if c.b %} ({{ c.b.rules|num }}){% endif %}</a>{% endfor %}{% if scope == 'search' %}<a href="#" aria-current="true">Search ({{ total|num }})</a>{% endif %}{% if scope == 'selected' %}<a href="#" aria-current="true">Selected ({{ n_selected|num }})</a>{% endif %}</span></div>
+      {% if per_engine %}
+      <div class="spread mt-4"><div><b>For which Suricata</b><p class="small muted mb-0">Only rules that passed <code class="nowrap">suricata -T</code> on that version</p></div>
+        <span class="seg" role="group" aria-label="Engine">{% for e, n in per_engine %}<a href="/export?{{ urlencode(dict(keepq, profile=(t.name if scope == 'profile' and t else ''), engine=e, format=fmt)) }}{% for x in h %}&amp;h={{ x }}{% endfor %}" aria-current="{{ 'true' if e == engine else 'false' }}">{{ e|eng_label }} ({{ n|num }})</a>{% endfor %}</span></div>
+      {% endif %}
+    </div></section>
+
+    <fieldset class="choices">
+      <legend>Format</legend>
+      {% for key, ico, title, desc in [
+        ('rules', 'file', 'One suricata.rules file', 'Merged and de-duplicated. Put it in <code>rule-files:</code> or <code>/var/lib/suricata/rules/</code>.'),
+        ('by-source', 'sources', 'One file per source (.zip)', 'Keeps licence boundaries. Flowbit setters stay with their own source.'),
+        ('update', 'link', 'suricata-update source', "A URL that always serves this profile's latest build. Your sensors pull it on their schedule."),
+        ('datasets', 'dataset', 'IOC rules as datasets', (ioc.values()|sum|num ~ ' IOC rules become dataset files plus one rule per buffer. Faster, smaller.') if ioc else 'IOC rules become dataset files plus one rule per buffer.')] %}
+      {% if key != 'update' or scope == 'profile' %}
+      <label class="choice"><input type="radio" name="format" value="{{ key }}"{% if fmt == key %} checked{% endif %}><span class="ci">{{ icon(ico) }}</span><strong>{{ title }}</strong><span class="d">{{ desc|safe }}</span></label>
+      {% endif %}{% endfor %}
+    </fieldset>
+
+    <section class="card"><div class="card-head"><h2>Options</h2><span class="xs muted">defaults are safe; change only if you need to</span></div>
+      <div class="card-body options">
+        <input type="hidden" name="remap" value="0">
+        <label class="check small"><input type="checkbox" name="remap" value="1"{% if remap %} checked{% endif %}>Fix sid clashes with stable new sids</label>
+        <label class="check small"><input type="checkbox" checked disabled>Bring in flowbit setters the rules need (always on)</label>
+        <label class="check small"><input type="checkbox" name="share" value="1"{% if share %} checked{% endif %}>Only rules I may share{% if lic_counts.get('restricted') %} (drops {{ lic_counts.restricted|num }} own-use rules){% endif %}</label>
+      </div>
+      <noscript><div class="card-foot"><button class="btn btn-sm" type="submit">Apply</button></div></noscript>
+    </section>
+
+    {% if scope == 'profile' and t %}
+    <section class="card"><div class="card-head"><h2>Use it with suricata-update</h2>{{ copy_btn('#su') }}</div>
+      <div class="card-body">
+        <p class="small mb-0">Add this once on each sensor. <code>suricata-update</code> then fetches the newest build of <b>{{ t.name }}</b>{% if engine %} for {{ engine|eng_label }}{% endif %} every time it runs.</p>
+        <div class="cmd multi"><code id="su">suricata-update add-source suriharvest-{{ t.name }} {{ feed }}
+suricata-update &amp;&amp; suricatasc -c reload-rules</code></div>
+        <p class="xs muted mt-2 mb-0">Sensors on another host: run <code>suriharvest serve --host 0.0.0.0</code> with a token, or publish a release (<code>suriharvest release build</code>) and use its <code>index.yaml</code>.</p>
+      </div></section>
+    {% endif %}
+
+    <section class="card"><div class="card-head"><h2>Same thing from the terminal</h2>{{ copy_btn('#cli') }}</div>
+      <div class="card-body"><div class="cmd"><code id="cli">{{ cli }}</code></div></div></section>
+  </form>
+
+  <aside class="summary-box stack" aria-label="Export summary">
+    <section class="card">
+      <div class="card-head"><h2>Your download</h2></div>
+      <div class="card-body">
+        <p class="mb-0"><span class="big">{{ keep|num }}</span> <span class="muted">rules{% if size and scope == 'profile' and not bad %} &middot; about {{ (size / 1048576)|round(1) }} MB{% endif %}</span></p>
+        <p class="xs muted mb-0">{% if bad %}{{ bad|num }} left out: do not load in {{ engine|eng_label }}. {% endif %}Flowbit setters the rules need are added from the whole index.</p>
+        {% if lic_counts %}
+        <table class="licence-table mt-2">
+          {% for cls in ['permissive', 'copyleft', 'restricted', 'none'] if lic_counts.get(cls) %}
+          <tr><td>{{ lic_class(cls) }}</td><td class="small">{{ lic_names.get(cls, [])|join(', ') }}</td><td class="num">{{ lic_counts[cls]|num }}</td></tr>
+          {% endfor %}
+        </table>
+        {% endif %}
+        {% set stem = (t.name ~ '-' ~ b.id if scope == 'profile' and t and b else 'suriharvest') ~ ('-suricata-' ~ (engine|eng_short) if engine else '') %}
+<pre class="file-tree mt-4">{{ stem }}{{ '.zip' if fmt in ('by-source', 'datasets') else '' }}
+{% if fmt == 'by-source' %}├── &lt;source&gt;.rules  one file per source
+└── manifest.jsonl  rule &rarr; source{% elif fmt == 'datasets' %}├── suricata.rules  rules + dataset rules
+├── datasets/       one list per buffer
+└── manifest.jsonl  rule &rarr; source{% elif fmt == 'update' %}├── rules/suricata.rules
+└── NOTICE.md       licences{% else %}└── suricata.rules  {{ keep|num }} rules{% endif %}</pre>
+        {% if fmt == 'update' and feed %}
+        <div class="url-box mt-4"><code id="feed-url">{{ feed }}</code>{{ copy_btn('#feed-url') }}</div>
+        <a class="btn btn-lg mt-2 w100" href="{{ feed }}">{{ icon('export') }}Download the feed (.tar.gz)</a>
+        {% elif keep %}
+        <a class="btn btn-primary btn-lg mt-4 w100" href="{{ dl }}">{{ icon('export') }}Download {{ 'suricata.rules' if fmt == 'rules' else '.zip' }}</a>
+        {% else %}
+        <span class="btn btn-primary btn-lg mt-4 w100" aria-disabled="true">Nothing to download</span>
+        {% endif %}
+        {% if lic_counts.get('restricted') and not share %}<p class="xs muted mt-2 mb-0">Contains own-use rules: fine for your sensors, do not publish it. Tick "Only rules I may share" for a file you can share.</p>{% elif lic_counts.get('copyleft') %}<p class="xs muted mt-2 mb-0">Contains copyleft (GPL) rules: share them under the same licence.</p>{% endif %}
+      </div>
+    </section>
+    {% if scope == 'profile' and b %}
+    <section class="card side-card">
+      <div class="card-head"><h2>Other files of build #{{ b.id }}</h2></div>
+      <div class="card-body"><ul class="rel-list">
+        <li><a href="/profiles/{{ t.name }}/builds/{{ b.id }}/changes.json">changes.json</a><span class="muted xs">+{{ b.summary.added|num }} &minus;{{ b.summary.removed|num }}</span></li>
+        <li><a href="/profiles/{{ t.name }}/builds/{{ b.id }}/excluded.jsonl">excluded.jsonl</a><span class="muted xs">{{ b.excluded|num }} rules + why</span></li>
+        <li><a href="/profiles/{{ t.name }}/builds/{{ b.id }}/manifest.jsonl">manifest.jsonl</a><span class="muted xs">{{ b.rules|num }} lines</span></li>
+        {% if b.summary.by_source %}<li><a href="/profiles/{{ t.name }}/export/{{ b.id }}/download?fmt=zip">by source (.zip)</a><span class="muted xs">{{ b.summary.by_source|length }} files</span></li>{% endif %}
+      </ul></div>
+    </section>
+    {% if fmt == 'by-source' and b.summary.by_source %}
+    <section class="card side-card">
+      <div class="card-head"><h2>Pick sources</h2></div>
+      <form class="card-body stack" method="get" action="/profiles/{{ t.name }}/export/{{ b.id }}/download">
+        {% for name, n in b.summary.by_source|dictsort(by='value', reverse=true) %}<label class="check small"><input type="checkbox" name="sources" value="{{ name }}" checked> {{ name }} <span class="muted xs">{{ n|num }} rules</span></label>{% endfor %}
+        <div class="row"><button class="btn btn-sm btn-primary" name="fmt" value="rules" type="submit">One .rules file</button><button class="btn btn-sm" name="fmt" value="zip" type="submit">.zip, a file per source</button></div>
+      </form>
+    </section>
+    {% endif %}
+    {% endif %}
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

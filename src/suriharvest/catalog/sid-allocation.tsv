@@ -1,0 +1,32 @@
+# source: https://sidallocation.org/ (github.com/sidallocation/sidallocation.org, last commit 2026-10-29), fetched 2026-11-14; two vendor owner names replaced by '(vendor range)' in this copy
+range_start	range_end	owner	note	url
+1000000	1999999	local	Reserved for Local Use - Put your custom rules in this range to avoid conflicts	
+2000000	2103999	Emerging Threats	Emerging Threats Open	https://community.emergingthreats.net/
+2200000	2299999	OISF	Suricata Engine Events	
+2400000	2609999	Emerging Threats	Emerging Threats Open	https://community.emergingthreats.net/
+2610000	2619999	Travis Green	Hunting Ruleset	https://github.com/travisbgreen/hunting-rules
+2700000	2799999	Emerging Threats	Emerging Threats	https://doc.emergingthreats.net/bin/view/Main/SidAllocation
+2800000	2899999	Emerging Threats	Emerging Threats commercial ruleset	https://doc.emergingthreats.net/bin/view/Main/SidAllocation
+3000000	3099999	(vendor range)	allocated to a vendor; owner name omitted in this copy	
+3100000	3199999	Stamus Networks	Stamus Networks Detection	https://stamus-networks.com
+3200000	3299999	DCSO	DCSO CyTec, DCSO Github	https://medium.com/@DCSO_CyTec https://github.com/DCSO/suricata-rules
+3300000	3399999	Pawpatrules	PAW Patrules	https://pawpatrules.fr/
+3400000	3499999	Aleksi Bovellan	NMAP Ruleset	https://github.com/aleksibovellan/opnsense-suricata-nmaps
+3500000	3509999	The Hunters Ledger	The Hunters Ledger - Community threat-intelligence Suricata feed (CC BY 4.0)	https://the-hunters-ledger.com/
+3600000	3609999	Echap	Echap Stalkerware Indicators	https://github.com/AssoEchap/stalkerware-indicators
+3700000	3799999	DERSec	DERSec	https://dersec.io
+4000000	4099999	ExtraHop	ExtraHop IDS	https://www.extrahop.com/solutions/security/ids/
+4100000	4199999	BI.ZONE	BI.ZONE SOC, rules	https://bi.zone/eng/catalog/services/soc/ https://github.com/bi-zone/detection-rules
+4200000	4299999	Vectra AI	Vectra AI	https://www.vectra.ai/
+5000000	5000213	Etnetera a.s.	Etnetera aggressive IP blacklist	https://security.etnetera.cz/feeds/etn_aggressive.rules
+6000000	6099999	Julioliraup	Antiphishing	https://github.com/julioliraup/Antiphishing
+8000000	8003000	(vendor range)	allocated to a vendor; owner name omitted in this copy	
+9555000	9954999	Wybot SAS	Wybot Cybersecurity	https://www.wybot-cybersecurite.com/
+10000000	11999999	Positive Technologies	PT Security Attack Detection Team ruleset	https://github.com/ptresearch/AttackDetection#sid-range
+12000000	12999999	IPFire	IPFire Domain Block List	https://www.ipfire.org/dbl/
+27990000	27999999	jpgview	DOH Rules	https://raw.githubusercontent.com/jpgpi250/piholemanual/master/DOH/DOH.rules
+80000000	89999999	Abuse.ch	URLhaus - sid is 80863100 + URLhaus URL id	https://urlhaus.abuse.ch/
+90000000	99999999	Abuse.ch	ThreatFox - sid is 90000000 + ThreatFox IOC id	https://threatfox.abuse.ch/
+100000000	199999999	Emerging Threats	Emerging Threats	https://doc.emergingthreats.net/bin/view/Main/SidAllocation
+900500000	900699999	Abuse.ch	Feodo Tracker - standard and aggressive rulesets	https://feodotracker.abuse.ch/
+902200000	906200096	Abuse.ch	SSLBL - SSL certificate, SSL IP and JA3 rulesets	https://sslbl.abuse.ch/

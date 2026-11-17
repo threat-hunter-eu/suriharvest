@@ -1,0 +1,14 @@
+{% extends "site_base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<h1>Search</h1>
+<form class="search-hero" action="search.html" method="get" role="search">
+  <div class="searchbar">{{ icon('search', 'ico ico-lg') }}<input type="search" id="q" name="q" aria-label="Search rules" aria-describedby="q-help" autocomplete="off" spellcheck="false" placeholder="Words of the message, sid:2024897, source:NAME, engine:8"></div>
+  <p class="examples" id="q-help">Searches the {{ unique|num }} published rules by message, sid, source and licence. Words must all match; <code>sid:</code>, <code>source:</code>, <code>licence:</code> and <code>engine:</code> filter.</p>
+</form>
+<noscript><div class="notice notice-warn">{{ icon('alert') }}<p>The search needs JavaScript. Every rule is also listed in <code>manifest.jsonl.gz</code> in the release.</p></div></noscript>
+<p class="small muted" id="search-status" role="status" aria-live="polite"></p>
+<table class="rows" id="search-results" data-index="search-index.json" hidden>
+<thead><tr><th scope="col" class="num">Sid</th><th scope="col">Message</th><th scope="col">Source</th><th scope="col">Licence</th><th scope="col">Engines</th></tr></thead>
+<tbody></tbody></table>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, lic, when, token, crumbs %}
+{% block title %}{{ src.name }} - Sources{% endblock %}
+{% block content %}
+{{ crumbs([('Sources', '/sources'), (src.name, none)]) }}
+{% set li = src_lic(src) %}
+<div class="page-head">
+  <div><h1>{{ src.name }} {{ lic(li[0], li[1]) }}</h1>
+    <p class="lede">{% if cfg and cfg.notes %}{{ cfg.notes }}<br>{% endif %}<span class="mono xs">{{ src.url|redact_url }}</span></p></div>
+  <div class="actions">
+    <a class="btn" href="/search?q=source:{{ src.name }}">{{ icon('search') }}Search this source</a>
+    {% if src.enabled and not missing %}<form action="/jobs/source/{{ src.name }}" method="post">{{ token() }}<button class="btn btn-primary" type="submit"{% if running %} disabled{% endif %}>{{ icon('refresh') }}Download only this</button></form>{% endif %}
+  </div>
+</div>
+{% if missing %}<div class="notice notice-warn">{{ icon('alert') }}<p>Token missing: set <code>{{ missing }}</code> in the environment of <code>suriharvest serve</code> and <code>suriharvest update</code>. Rules from the last good download are kept.</p></div>{% endif %}
+{% if log and log[0].status not in ('ok', 'running') %}<div class="notice">{{ icon('alert') }}<p><b>Skipped in the last update</b> ({{ when(log[0].started_at) }}): {{ friendly_error(log[0].error) or log[0].status }}. Rules from the last good download are kept; the next update tries again.</p></div>{% endif %}
+
+<section class="hero" aria-label="This source at a glance">
+  <div class="stat"><span class="stat-n">{{ n_rules|num }}</span><span class="stat-l">Rule lines</span><span class="stat-d">as published, copies included</span></div>
+  <a class="stat" href="/search?q=source:{{ src.name }}"><span class="stat-n">{{ unique|num }}</span><span class="stat-l">Unique rules</span><span class="stat-d">counted under this source</span></a>
+  <div class="stat"><span class="stat-n">{{ only_here|num }}</span><span class="stat-l">Found nowhere else</span><span class="stat-d">no other source carries them</span></div>
+  <div class="stat"><span class="stat-n">{{ n_quar|num }}</span><span class="stat-l">Quarantined lines</span><span class="stat-d">look like rules, do not parse</span></div>
+</section>
+
+<div class="dash">
+  <div class="stack">
+    {% if engines %}
+    <section class="card"><div class="card-head"><h2>Suricata check</h2></div><div class="card-body"><div class="engine-rows">
+      {% for e, ok, bad in engines %}{% set all_ = unique %}
+      <div class="engine-row"><span class="name"><b>{{ e|eng_label }}</b><span>{{ ok|num }} load &middot; {{ bad|num }} fail</span></span>
+        <span class="split-bar" role="img" aria-label="{{ ok|num }} load, {{ bad|num }} do not load">{% if ok %}<span class="ok {{ ok|wcls(all_) }}"></span>{% endif %}{% if bad %}<span class="fail {{ bad|wcls(all_) }}"></span>{% endif %}</span>
+        <span class="pct">{% if ok + bad %}<b>{{ '%.1f'|format(100 * ok / (ok + bad)) }}%</b>{% else %}<span class="muted xs">not checked</span>{% endif %}</span></div>
+      {% endfor %}</div></div></section>
+    {% endif %}
+    <section class="card"><div class="card-head"><h2>Quarantine <span class="sub">lines that look like rules but do not parse</span></h2></div>
+      {% if quarantine %}<div class="table-scroll"><table class="rows"><thead><tr><th scope="col">File:line</th><th scope="col">Error</th></tr></thead><tbody>
+      {% for path, line, err, raw in quarantine %}<tr><td class="mono xs">{{ path }}:{{ line }}</td><td>{{ err }}<div class="mono xs muted">{{ raw[:240] }}</div></td></tr>{% endfor %}
+      </tbody></table></div>{% else %}<div class="card-body"><p class="small muted mb-0">Empty: every rule line of this source parses.</p></div>{% endif %}
+    </section>
+    <section class="card"><div class="card-head"><h2>Download log</h2></div>
+      <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">When</th><th scope="col">Result</th><th scope="col" class="num">Rules read</th><th scope="col" class="num">New versions</th><th scope="col">Files +/~/&minus;</th></tr></thead><tbody>
+      {% for l in log %}<tr><td class="small">{{ when(l.started_at) }}</td><td>{% if l.status == 'ok' %}<span class="badge val-valid">ok</span>{% else %}<span class="badge val-invalid">{{ l.status }}</span> <span class="xs muted">{{ (l.error or '')[:160] }}</span>{% endif %}</td><td class="num">{{ l.rules_seen|num }}</td><td class="num">{{ l.versions_new|num }}</td><td class="small mono">+{{ l.files_added }} ~{{ l.files_changed }} &minus;{{ l.files_removed }}</td></tr>
+      {% else %}<tr><td colspan="5" class="muted">Never downloaded.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="card side-card"><div class="card-head"><h2>Settings</h2><span class="xs muted">sources.yaml</span></div><div class="card-body"><dl class="kv">
+      <dt>Type</dt><dd>{{ src.type }}</dd>
+      <dt>Priority</dt><dd>{{ src.priority }} <span class="muted xs">(lower wins)</span></dd>
+      <dt>Licence</dt><dd>{{ src.licence or 'none stated' }}</dd>
+      <dt>May share</dt><dd>{{ {'yes': 'yes', 'no': 'no: own use only', 'unknown': 'unknown'}.get(src.redistribute, src.redistribute) }}</dd>
+      <dt>Sid namespace</dt><dd class="mono">{{ src.sid_namespace }}</dd>
+      {% if cfg %}<dt>Tier</dt><dd>{{ cfg.tier or '-' }}</dd><dt>Status</dt><dd>{{ cfg.status }}</dd>{% if cfg.homepage %}<dt>Homepage</dt><dd>{% if cfg.homepage|web_link %}<a href="{{ cfg.homepage|web_link }}" rel="noreferrer noopener" target="_blank">{{ cfg.homepage }}</a>{% else %}{{ cfg.homepage }}{% endif %}</dd>{% endif %}{% endif %}
+      <dt>Last commit</dt><dd class="mono xs">{{ (src.last_commit or '-')[:16] }}</dd>
+    </dl></div></section>
+    <section class="card side-card"><div class="card-head"><h2>Overlap with other sources</h2></div><div class="card-body">
+      {% if overlap %}<ul class="rel-list">{% for name, n in overlap %}<li><a href="/sources/{{ name }}">{{ name }}</a><span class="muted xs">{{ n|num }} shared rules</span></li>{% endfor %}</ul>{% else %}<p class="small muted mb-0">No rule of {{ src.name }} is in another source.</p>{% endif %}
+    </div></section>
+  </div>
+</div>
+{% endblock %}

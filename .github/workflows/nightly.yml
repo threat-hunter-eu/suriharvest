@@ -1,0 +1,798 @@
+name: Nightly build and release
+
+# Sync the free, redistributable Suricata sources, validate on Suricata 7 and 8, build one merged ruleset per
+# engine, check the exact published files with `suricata -T` inside the pinned engine images, commit the sid map
+# to the dedicated `state` branch (never to main) and publish a GitHub Release. Nothing runs until the repo variable SURIHARVEST_AUTOMATION_ENABLED is 'true'.
+
+on:
+  schedule:
+    - cron: '23 3 * * *' # off the hour; ET Open publishes around 21:00 UTC
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: Publish a release even if the content id did not change.
+        type: boolean
+        default: false
+      cold_start:
+        description: Ignore the cache (fresh downloads and a new database).
+        type: boolean
+        default: false
+      ignore_gates:
+        description: Report gate failures but publish anyway (after a reviewed, intended drop).
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One data pipeline at a time; never cancel a run that may be committing the sid map or publishing.
+concurrency:
+  group: suriharvest-data
+  cancel-in-progress: false
+
+env:
+  SURIHARVEST_HOME: ${{ github.workspace }}/.ws
+  PYTHON_VERSION: '3.12'
+  RELEASE_DIR: ${{ github.workspace }}/.out/release
+  PREV_DIR: ${{ github.workspace }}/.out/previous
+  # Where the rulesets are published: the public data repository (owner/name, e.g. threat-hunter-eu/suriharvest-rules)
+  # when the repo variable SURIHARVEST_RULES_REPO is set, otherwise this repository (the behaviour before the split).
+  # The sid map (`state` branch), stats (`data` branch) and failure issues stay in this repository.
+  # docs/automation.md#rules-repository
+  RULES_REPO: ${{ vars.SURIHARVEST_RULES_REPO || github.repository }}
+  CATALOG: src/suriharvest/catalog/sources.yaml
+  SID_MAP: state/sid-map.tsv
+  # The persistent sid map lives on this branch only (orphan, one file: state/sid-map.tsv). main never gets automated
+  # commits, so it can require PRs. docs/automation.md#sid-map-state-branch
+  STATE_BRANCH: state
+  # Fills ${suricata_version} in source URLs (ET Open serves the same tarball for 7.0.3 and 8.0 today).
+  # Keep in sync with the matrix of `verify` and with ci.yml (ci.yml checks that all pins agree).
+  ENGINE_7_IMAGE: docker.io/jasonish/suricata:7.0.17@sha256:6f915ca62512c9859e888648765515b73b209dfa8a03a65edf1607f17e11fa51
+  ENGINE_8_IMAGE: docker.io/jasonish/suricata:8.0.8@sha256:d5a3a1785299ab40918d465e54fedf8e3afeeedba76bb64b0cc74dbc20bda2c3
+
+jobs:
+  # Downloads and parses untrusted third-party archives: read-only token, no persisted credentials, no secrets.
+  build:
+    if: >-
+      vars.SURIHARVEST_AUTOMATION_ENABLED == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch || 'main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.decide.outputs.changed }}
+      content_id: ${{ steps.decide.outputs.content_id }}
+      sidmap_changed: ${{ steps.sidmap.outputs.changed }}
+      sidmap_base: ${{ steps.sidmap.outputs.base }}
+      sidmap_ref: ${{ steps.statemap.outputs.ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: false # this job builds release files: no uv cache restored from other runs
+
+      - run: uv sync --locked --no-dev
+
+      - id: date
+        run: |
+          d=$(date -u +%F)
+          echo "date=$d" >> "$GITHUB_OUTPUT"
+          # Reproducible files: every file in a release carries the run date at 00:00 UTC.
+          echo "epoch=$(date -u -d "$d" +%s)" >> "$GITHUB_OUTPUT"
+
+      # validate.py runs `docker run --rm --network=none ... <image>` per batch; pull once, by digest.
+      - name: Pull engine images
+        run: |
+          set -euo pipefail
+          docker pull -q "$ENGINE_7_IMAGE"
+          docker pull -q "$ENGINE_8_IMAGE"
+
+      # Key per day; restore-keys fall back to the newest earlier snapshot (conditional GETs, validation cache).
+      - name: Restore workspace (corpus + database + caches)
+        id: cache
+        if: ${{ !inputs.cold_start }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .ws/corpus
+            .ws/data
+          key: suriharvest-ws-v1-${{ runner.os }}-${{ steps.date.outputs.date }}
+          restore-keys: |
+            suriharvest-ws-v1-${{ runner.os }}-
+
+      # The current sid map, read through the API (this job holds no git credentials) from the tip of the state
+      # branch, into $SID_MAP of this checkout. No state branch yet: start empty, but only when nothing was ever
+      # published; otherwise stop (restore the branch first, docs/automation.md#sid-map-state-branch).
+      - name: Sid map from the state branch
+        id: statemap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASES_REPO: ${{ vars.SURIHARVEST_RULES_REPO || github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$SID_MAP")"
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/branches/$STATE_BRANCH" --jq '.commit.sha' 2>"$RUNNER_TEMP/branch.err"); then
+            gh api -H 'Accept: application/vnd.github.raw' \
+              "repos/$GITHUB_REPOSITORY/contents/$SID_MAP?ref=$ref" > "$SID_MAP"
+            echo "sid map from $STATE_BRANCH@$ref: $(wc -l < "$SID_MAP") lines"
+          elif grep -q 'HTTP 404' "$RUNNER_TEMP/branch.err"; then
+            published=$(gh release list -R "$RELEASES_REPO" --limit 100 --exclude-drafts --json tagName \
+                        --jq '[.[] | select(.tagName | startswith("rules-"))] | length')
+            if [ "$published" != "0" ]; then
+              echo "::error::branch $STATE_BRANCH is missing but rules-* releases exist: restore it from the latest release's sid-map.tsv"
+              exit 1
+            fi
+            ref=none
+            rm -f "$SID_MAP"
+            echo "no $STATE_BRANCH branch and no release yet: empty sid map (first publication)"
+          else
+            cat "$RUNNER_TEMP/branch.err" >&2
+            echo "::error::cannot read branch $STATE_BRANCH"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      # Core tier only for now (docs/automation.md). Engines 7 and 8: a source whose URL holds ${suricata_version}
+      # (ET Open) is downloaded once per major and each engine validates and publishes its own copy (docs/sources.md).
+      - name: Prepare workspace (redistributable core sources only, engines 7 and 8)
+        run: |
+          set -euo pipefail
+          uv run suriharvest init "$SURIHARVEST_HOME" --refresh \
+            --catalog "$CATALOG" --tier core --redistributable-only \
+            --engine "suricata-7=$ENGINE_7_IMAGE" --engine "suricata-8=$ENGINE_8_IMAGE"
+          # The persistent sid map (from the state branch, step above); the workspace reads and extends a copy of it.
+          mkdir -p "$SURIHARVEST_HOME/state"
+          if [ -f "$SID_MAP" ]; then cp "$SID_MAP" "$SURIHARVEST_HOME/state/sid-map.tsv"; else : > "$SURIHARVEST_HOME/state/sid-map.tsv"; fi
+
+      # Defence in depth: the published build may only ever see sources that are redistributable.
+      - name: Guard (workspace holds only redistributable, active sources)
+        run: |
+          uv run python - "$SURIHARVEST_HOME/sources.yaml" <<'PY'
+          import sys, yaml
+          srcs = (yaml.safe_load(open(sys.argv[1], encoding="utf-8")) or {}).get("sources", [])
+          bad = [s["name"] for s in srcs if s.get("enabled", True) and (
+              s.get("redistribute") not in (True, "yes") or s.get("tier") in ("user-fetch", "experimental")
+              or s.get("auth") or s.get("status", "active") not in ("active", "stale"))]
+          if bad:
+              sys.exit(f"not allowed in the public build: {bad}")
+          if not srcs:
+              sys.exit("no sources")
+          print(f"{len(srcs)} sources, all redistributable")
+          PY
+
+      - name: Doctor (create/upgrade the database, probe both engines)
+        run: uv run suriharvest doctor
+
+      - name: Update (sync, ingest, validate new rules on 7 and 8, index, corpus gates)
+        run: >-
+          uv run suriharvest update
+          --allow-failures
+          --max-failed-sources 10
+          --report-file "$RUNNER_TEMP/update-report.md"
+
+      # Read-only, from the rules repository (public: GITHUB_TOKEN can read it; a private or missing one fails here).
+      - name: Previous release (baseline for gates and changes)
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ vars.SURIHARVEST_RULES_REPO || github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$PREV_DIR"
+          tag=$(gh release list --limit 100 --exclude-drafts --json tagName \
+                --jq '[.[] | select(.tagName | startswith("rules-"))][0].tagName // ""')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ -n "$tag" ]; then
+            gh release download "$tag" -D "$PREV_DIR" -p summary.json -p manifest.jsonl.gz -p SHA256SUMS
+            (cd "$PREV_DIR" && sha256sum --check --ignore-missing SHA256SUMS)
+          else
+            echo "no previous rules-* release: first publication, release gates are skipped"
+          fi
+
+      - name: Build release files (merged per engine, per source, licences, recipes, index.yaml)
+        env:
+          BUILD_EPOCH: ${{ steps.date.outputs.epoch }}
+          IGNORE_GATES: ${{ inputs.ignore_gates || false }}
+          MAX_DROP_PCT: ${{ vars.SURIHARVEST_MAX_DROP_PCT || '5' }}
+        run: |
+          set -euo pipefail
+          extra=()
+          [ -f "$PREV_DIR/summary.json" ] && extra+=(--previous "$PREV_DIR")
+          [ "$IGNORE_GATES" = "true" ] && extra+=(--no-gates)
+          uv run suriharvest release build "$RELEASE_DIR" \
+            --engine suricata-7 --engine suricata-8 \
+            --redistributable-only \
+            --recipes-from "$CATALOG" \
+            --download-base "https://github.com/${RULES_REPO}/releases/latest/download" \
+            --build-epoch "$BUILD_EPOCH" \
+            --max-drop-pct "$MAX_DROP_PCT" \
+            --max-source-drop-pct 50 \
+            --report-file "$RUNNER_TEMP/release-report.md" \
+            "${extra[@]}"
+          ls -la "$RELEASE_DIR"
+          (cd "$RELEASE_DIR" && sha256sum --check SHA256SUMS)
+          # GitHub refuses 0-byte release assets (HTTP 400): fail here, before the sid map is committed.
+          empty=$(find "$RELEASE_DIR" -type f -empty -printf '%f ')
+          [ -z "$empty" ] || { echo "::error::empty release files (GitHub cannot upload them): $empty"; exit 1; }
+
+      - name: Check index.yaml (suricata-update index schema, points at assets of this release)
+        run: |
+          uv run python - "$RELEASE_DIR" "https://github.com/${RULES_REPO}/releases/latest/download/" <<'PY'
+          import sys, yaml
+          from pathlib import Path
+          rel, base = Path(sys.argv[1]), sys.argv[2]
+          idx = yaml.safe_load((rel / "index.yaml").read_text(encoding="utf-8"))
+          assert idx.get("version") == 1 and isinstance(idx.get("sources"), dict), "bad index.yaml shape"
+          for key, src in idx["sources"].items():
+              url = src["url"]
+              assert url.startswith(base), f"{key}: {url}"
+              assert (rel / url[len(base):]).is_file(), f"{key}: {url} is not a release asset"
+              for field in ("vendor", "summary", "license", "min-version"):
+                  assert src.get(field), f"{key}: missing {field}"
+          print("index.yaml ok:", ", ".join(idx["sources"]))
+          PY
+
+      - name: Sid map (append-only, copied back for the state job)
+        id: sidmap
+        run: |
+          set -euo pipefail
+          new="$SURIHARVEST_HOME/state/sid-map.tsv"
+          base=$( [ -f "$SID_MAP" ] && sha256sum "$SID_MAP" | cut -d' ' -f1 || echo none )
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/state"
+          cp "$new" "$RUNNER_TEMP/state/sid-map.tsv"
+          if [ -f "$SID_MAP" ] && cmp -s "$SID_MAP" "$new"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "sid map: $(wc -l < "$new") entries ($( [ -f "$SID_MAP" ] && wc -l < "$SID_MAP" || echo 0) before)"
+          fi
+
+      - name: Decide whether content changed
+        id: decide
+        env:
+          FORCE: ${{ inputs.force_release || false }}
+        run: |
+          set -euo pipefail
+          new=$(jq -r '.content_id' "$RELEASE_DIR/summary.json")
+          old=""
+          [ -f "$PREV_DIR/summary.json" ] && old=$(jq -r '.content_id' "$PREV_DIR/summary.json")
+          changed=false
+          if [ "$new" != "$old" ] || [ "$FORCE" = "true" ]; then changed=true; fi
+          echo "content_id=$new" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          {
+            echo "## suriharvest nightly"
+            echo "- content id: \`$new\` (previous: \`${old:-none}\`) -> publish: **$changed**"
+            jq -r '.engines | to_entries[] | "- \(.key) (Suricata \(.value.version)): \(.value.rules) rules (\(.value.enabled) enabled)"' "$RELEASE_DIR/summary.json"
+            jq -r '"- changes: +\(.added | length) ~\(.modified | length) -\(.removed | length)"' "$RELEASE_DIR/changes.json"
+            echo
+            cat "$RUNNER_TEMP/release-report.md" 2>/dev/null || true
+            echo
+            cat "$RUNNER_TEMP/update-report.md" 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkpoint SQLite before caching
+        run: >-
+          uv run python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]);
+          c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" "$SURIHARVEST_HOME/data/suriharvest.db"
+
+      # Only after update + release gates passed: a failed night never overwrites the last good snapshot.
+      - name: Save workspace
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .ws/corpus
+            .ws/data
+          key: suriharvest-ws-v1-${{ runner.os }}-${{ steps.date.outputs.date }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: ${{ env.RELEASE_DIR }}/
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sid-map
+          path: ${{ runner.temp }}/state/sid-map.tsv
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/update-report.md
+            ${{ runner.temp }}/release-report.md
+            .ws/reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Final check on the exact files that will be published, inside the pinned engine images, without suriharvest.
+  verify:
+    needs: build
+    if: needs.build.outputs.changed == 'true'
+    name: suricata -T (Suricata ${{ matrix.engine }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - engine: '7'
+            image: docker.io/jasonish/suricata:7.0.17@sha256:6f915ca62512c9859e888648765515b73b209dfa8a03a65edf1607f17e11fa51
+          - engine: '8'
+            image: docker.io/jasonish/suricata:8.0.8@sha256:d5a3a1785299ab40918d465e54fedf8e3afeeedba76bb64b0cc74dbc20bda2c3
+    container:
+      image: ${{ matrix.image }}
+    env:
+      E: ${{ matrix.engine }}
+    steps:
+      - run: dnf -y -q install tar gzip && suricata -V
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - name: Checksums, engine version, tarball == flat files, per-source files partition the merged file
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check SHA256SUMS)
+          want=$(python3 -c "import json,sys; print(json.load(open('release/summary.json'))['engines']['suricata-'+sys.argv[1]]['version'])" "$E")
+          have=$(suricata -V | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          [ "$want" = "$have" ] || { echo "::error::built with Suricata $want, verifying with $have"; exit 1; }
+          mkdir -p t
+          tar -xzf "release/suriharvest-$E.tar.gz" -C t
+          [ "$(sha256sum < "release/suricata-$E.rules")" = "$(sha256sum < t/rules/suricata.rules)" ] \
+            || { echo "::error::suricata-$E.rules differs from the tarball"; exit 1; }
+          # the tarball carries the merged file only (suricata-update loads every *.rules member): no by-source copies
+          if tar -tzf "release/suriharvest-$E.tar.gz" | grep -q '^rules/by-source/'; then
+            echo "::error::suriharvest-$E.tar.gz carries by-source copies (suricata-update would load duplicates)"; exit 1
+          fi
+          rules() { grep -hE '^#?[[:space:]]*(alert|drop|reject|pass|rejectsrc|rejectdst|rejectboth)[[:space:]]' "$@" | sort; }
+          [ "$(rules "release/suricata-$E.rules" | sha256sum)" = "$(rules release/suricata-"$E".by-source.*.rules | sha256sum)" ] \
+            || { echo "::error::per-source files are not a partition of suricata-$E.rules"; exit 1; }
+
+      - name: suricata -T on every published rules file (0 errors, all enabled rules loaded)
+        run: |
+          set -euo pipefail
+          mapfile -t overrides < <(grep -vE '^\s*(#|$)' release/suricata-overrides.txt)
+          sets=(); for o in "${overrides[@]}"; do sets+=(--set "$o"); done
+          # Flat merged file installed the way a non-suricata-update user would: next to its dataset files.
+          mkdir -p flat && cp "release/suricata-$E.rules" release/suricata-"$E".by-source.*.rules flat/
+          # Dataset files (datasets/<source>/...) unpack next to the flat file; the tarball already holds them.
+          if [ -f "release/suricata-$E.datasets.tar.gz" ]; then tar -xzf "release/suricata-$E.datasets.tar.gz" -C flat; fi
+          # The tarball's merged classification/reference config, as suricata-update would install it.
+          cfgs=()
+          [ -f t/rules/classification.config ] && cfgs+=(--set "classification-file=$PWD/t/rules/classification.config")
+          [ -f t/rules/reference.config ] && cfgs+=(--set "reference-config-file=$PWD/t/rules/reference.config")
+          check() { # check <dir> <rules file> <expected enabled rules>
+            local dir=$1 file=$2 want=$3 log
+            log=$(mktemp -d)
+            local rc=0 line loaded failed
+            suricata -T -v -c /etc/suricata/suricata.yaml -l "$log" -S "$dir/$file" \
+              --set default-rule-path="$dir" \
+              "${cfgs[@]}" "${sets[@]}" > "$log/out.txt" 2>&1 || rc=$?
+            line=$(grep -oE '[0-9]+ rules successfully loaded, [0-9]+ rules failed' "$log/out.txt" | tail -1 || true)
+            loaded=$(echo "$line" | awk '{print $1}'); failed=$(echo "$line" | awk '{print $5}')
+            echo "$file: rc=$rc loaded=${loaded:-?} failed=${failed:-?} expected=$want"
+            if [ "$rc" -ne 0 ] || [ -z "$line" ] || [ "$failed" != "0" ] || [ "$loaded" != "$want" ] \
+               || grep -qE '^(E: |Error: |\[ERRCODE)' "$log/out.txt"; then
+              echo "::error::suricata -T failed for $file on Suricata $E"
+              grep -E '^(E: |Error: |\[ERRCODE)' "$log/out.txt" | head -50 || tail -50 "$log/out.txt"
+              return 1
+            fi
+          }
+          count() { python3 - "$1" "$2" <<'PY'
+          import json, sys
+          s = json.load(open("release/summary.json"))["engines"]["suricata-" + sys.argv[1]]
+          print(s["enabled"] if sys.argv[2] == "-" else s["by_source"][sys.argv[2]]["enabled"])
+          PY
+          }
+          check "$PWD/flat" "suricata-$E.rules" "$(count "$E" -)"
+          check "$PWD/t/rules" "suricata.rules" "$(count "$E" -)"
+          for f in flat/suricata-"$E".by-source.*.rules; do
+            src=${f#flat/suricata-"$E".by-source.}; src=${src%.rules}
+            # published per-source files sit next to the flat merged file and its datasets/ folder
+            check "$PWD/flat" "$(basename "$f")" "$(count "$E" "$src")"
+          done
+
+  # Commits the sid map to the state branch before anything is published: entries only reserve sids, so a commit
+  # followed by a failed publish is harmless, while a published release whose sids are not recorded would break sid
+  # stability. Pushes only to $STATE_BRANCH (never main), with the token given to git for the fetch/push only.
+  state:
+    needs: [build, verify]
+    if: needs.build.outputs.changed == 'true' && needs.build.outputs.sidmap_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.push.outputs.sha }}
+    env:
+      BASE: ${{ needs.build.outputs.sidmap_base }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      # The previous PUBLISHED release lives in the rules repository (read-only here).
+      RELEASES_REPO: ${{ vars.SURIHARVEST_RULES_REPO || github.repository }}
+    steps:
+      # main, for the trusted checker (src/suriharvest/sidmap_check.py); never pushed to.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sid-map
+          path: ${{ runner.temp }}/state
+
+      # The new release's files: its manifest, checked against the rules files that will be published.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release
+
+      # The previous PUBLISHED release is the authority, fetched here from GitHub (not from the build artifact, not
+      # from the state branch): its manifest is the only thing that allows retiring a row, and its sid-map.tsv is the
+      # floor the new map must extend. Without a release, no sid map row may be retired.
+      - name: Previous published manifest and sid map
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prev"
+          tag=$(gh release list -R "$RELEASES_REPO" --limit 100 --exclude-drafts --json tagName \
+                --jq '[.[] | select(.tagName | startswith("rules-"))][0].tagName // ""')
+          if [ -n "$tag" ]; then
+            gh release download -R "$RELEASES_REPO" "$tag" -D "$RUNNER_TEMP/prev" -p manifest.jsonl.gz -p sid-map.tsv -p SHA256SUMS
+            (cd "$RUNNER_TEMP/prev" && sha256sum --check --ignore-missing SHA256SUMS)
+          fi
+
+      - name: Fetch the state branch
+        env:
+          STATE_DIR: ${{ runner.temp }}/state-branch
+        run: |
+          set -euo pipefail
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          gitauth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth")
+          git init -q "$STATE_DIR"
+          cd "$STATE_DIR"
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          rc=0; git "${gitauth[@]}" ls-remote --exit-code --heads origin "refs/heads/$STATE_BRANCH" >/dev/null || rc=$?
+          case "$rc" in
+            0) git "${gitauth[@]}" fetch -q --depth 1 origin "refs/heads/$STATE_BRANCH"
+               git switch -q -C "$STATE_BRANCH" FETCH_HEAD ;;
+            2) git switch -q --orphan "$STATE_BRANCH" ;; # first sid map commit
+            *) echo "::error::cannot list branch $STATE_BRANCH (git exit $rc)"; exit 1 ;;
+          esac
+
+      # Re-check here: this job holds a write token, the artifact came from a job that parsed untrusted data.
+      - name: Re-validate (same base, allowed transitions only, well-formed)
+        env:
+          STATE_DIR: ${{ runner.temp }}/state-branch
+        run: |
+          set -euo pipefail
+          old="$STATE_DIR/$SID_MAP"
+          cur=$( [ -f "$old" ] && sha256sum "$old" | cut -d' ' -f1 || echo none )
+          [ "$cur" = "$BASE" ] || { echo "::error::$SID_MAP changed on branch $STATE_BRANCH since the build started"; exit 1; }
+          [ -f "$old" ] || { old="$RUNNER_TEMP/empty-sid-map.tsv"; : > "$old"; }
+          # new rows, owner reclaim, revision take-over, retirement of rules in neither manifest (sidmap_check.py, stdlib only);
+          # every gid:sid of the published rules files must be in the new manifest
+          prev=()
+          [ -f "$RUNNER_TEMP/prev/manifest.jsonl.gz" ] && prev=(--previous-manifest "$RUNNER_TEMP/prev/manifest.jsonl.gz")
+          python3 -I src/suriharvest/sidmap_check.py "$old" "$RUNNER_TEMP/state/sid-map.tsv" \
+            --manifest "$RUNNER_TEMP/release/manifest.jsonl.gz" "${prev[@]}" --rules "$RUNNER_TEMP"/release/*.rules
+          # And against the map the last release shipped: rows dropped from the state branch itself (outside this
+          # check) cannot slip through, the published release stays the authority.
+          if [ -f "$RUNNER_TEMP/prev/sid-map.tsv" ]; then
+            python3 -I src/suriharvest/sidmap_check.py "$RUNNER_TEMP/prev/sid-map.tsv" "$RUNNER_TEMP/state/sid-map.tsv" \
+              --manifest "$RUNNER_TEMP/release/manifest.jsonl.gz" "${prev[@]}" --rules "$RUNNER_TEMP"/release/*.rules
+          fi
+
+      - name: Commit and push the sid map to the state branch
+        id: push
+        working-directory: ${{ runner.temp }}/state-branch
+        run: |
+          set -euo pipefail
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          mkdir -p "$(dirname "$SID_MAP")"
+          cp "$RUNNER_TEMP/state/sid-map.tsv" "$SID_MAP"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$SID_MAP"
+          git commit -q -m "state: sid map $(date -u +%F) (build of $GITHUB_SHA)"
+          # Not forced: if the branch moved since the fetch, the push fails and nothing is published.
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$STATE_BRANCH"
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "- sid map committed to \`$STATE_BRANCH\` at \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # Keyless signing writes a PUBLIC Sigstore (Rekor) log entry naming the repository, workflow, run and commit, and
+  # it cannot be removed. Fail-closed gate: the job only asks for the variable here; the step below asks the API
+  # whether the repository is public and signs only on an explicit `"private": false` answer. Any error, a missing
+  # field or a private repository -> no signature (docs/automation.md#signing). Separate job, so `id-token: write`
+  # is never granted to the job that holds `contents: write`.
+  sign:
+    needs: [build, verify, state]
+    if: >-
+      always() && vars.SURIHARVEST_SIGNING_ENABLED == 'true' &&
+      needs.build.outputs.changed == 'true' &&
+      needs.verify.result == 'success' &&
+      (needs.state.result == 'success' || needs.state.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read # the visibility lookup (repos/{owner}/{repo}) and nothing else
+      id-token: write # keyless cosign; used only after the visibility gate passed
+    outputs:
+      signed: ${{ steps.sign.outcome == 'success' }}
+    steps:
+      # Both repositories: this one (named in the Rekor entry) and the rules repository (where the signature goes).
+      - name: Repository visibility (fail-closed, this repository and the rules repository)
+        id: vis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          public=true
+          for repo in "$GITHUB_REPOSITORY" "$RULES_REPO"; do
+            private=$(gh api "repos/$repo" --jq '.private' 2>/dev/null) || private=''
+            [ "$private" = "false" ] || public=false
+            echo "$repo: API private=${private:-<error>}"
+          done
+          echo "public=$public" >> "$GITHUB_OUTPUT"
+          echo "repositories public: $public"
+
+      - if: steps.vis.outputs.public == 'true' && vars.SURIHARVEST_SIGNING_ENABLED == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - if: steps.vis.outputs.public == 'true' && vars.SURIHARVEST_SIGNING_ENABLED == 'true'
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: 'v3.1.4'
+
+      - name: Sign SHA256SUMS (keyless cosign; verified-public repository and SURIHARVEST_SIGNING_ENABLED only)
+        id: sign
+        if: steps.vis.outputs.public == 'true' && vars.SURIHARVEST_SIGNING_ENABLED == 'true'
+        working-directory: release
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS
+          cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+
+      - if: steps.sign.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-signature
+          path: release/SHA256SUMS.sigstore.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # Publishes into the rules repository (RULES_REPO). Cross-repository: a GitHub App installation token, minted here
+  # only, after every gate, limited to contents:write on that one repository and valid for one hour. The App key is a
+  # secret of the `rules-publish` environment (deployment branches: main only), so no other job or branch can read
+  # it. Same repository (SURIHARVEST_RULES_REPO unset): GITHUB_TOKEN as before. docs/automation.md#rules-repository
+  publish:
+    needs: [build, verify, state, sign]
+    if: >-
+      always() &&
+      needs.build.outputs.changed == 'true' &&
+      needs.verify.result == 'success' &&
+      (needs.state.result == 'success' || needs.state.result == 'skipped') &&
+      (needs.sign.result == 'success' || needs.sign.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: rules-publish
+    permissions:
+      contents: write # create releases, delete old ones (only used when the rules repository is this repository)
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    env:
+      GH_REPO: ${{ vars.SURIHARVEST_RULES_REPO || github.repository }}
+      KEEP_RELEASES: ${{ vars.SURIHARVEST_KEEP_RELEASES || '30' }}
+      KEEP_MONTHLY: ${{ vars.SURIHARVEST_KEEP_MONTHLY || '12' }}
+      # The main commit that was built (the sid map commit lives on the state branch, not here).
+      TARGET: ${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - name: Verify checksums
+        working-directory: release
+        run: sha256sum --check SHA256SUMS
+
+      # Only present when `sign` signed (verified-public repositories with signing enabled).
+      - if: needs.sign.outputs.signed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-signature
+          path: release
+
+      # index.yaml was built for RULES_REPO (build job); refuse to publish it anywhere else.
+      - name: Rules repository owner and name (index.yaml points at it)
+        id: dest
+        run: |
+          set -euo pipefail
+          [[ "$GH_REPO" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::bad SURIHARVEST_RULES_REPO: $GH_REPO"; exit 1; }
+          grep -q "https://github.com/$GH_REPO/releases/latest/download/" release/index.yaml \
+            || { echo "::error::index.yaml does not point at $GH_REPO"; exit 1; }
+          echo "owner=${GH_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${GH_REPO#*/}" >> "$GITHUB_OUTPUT"
+          if [ "$GH_REPO" = "$GITHUB_REPOSITORY" ]; then echo "cross=false"; else echo "cross=true"; fi >> "$GITHUB_OUTPUT"
+          echo "publishing to $GH_REPO"
+
+      - name: Token for the rules repository (GitHub App; contents write on that repository only)
+        id: app
+        if: steps.dest.outputs.cross == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SURIHARVEST_RULES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SURIHARVEST_RULES_APP_KEY }}
+          owner: ${{ steps.dest.outputs.owner }}
+          repositories: ${{ steps.dest.outputs.name }}
+          permission-contents: write
+
+      - name: Pick tag rules-YYYY-MM-DD (suffix .N on a same-day rerun)
+        id: tag
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          base="rules-$(date -u +%F)"
+          tag="$base"; n=1
+          while gh release view "$tag" >/dev/null 2>&1; do n=$((n+1)); tag="$base.$n"; done
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # build-info.json is written here, outside SHA256SUMS (informational): which tool commit and run built the files.
+      # The rules repository's pages.yml builds the site with that tool commit after checking it is on main.
+      - name: Publish release (draft first, then public, so a half-uploaded release is never visible)
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          CROSS: ${{ steps.dest.outputs.cross }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg sha "$TARGET" --arg run "$RUN_URL" --arg tag "$TAG" \
+            '{format: 1, tool_repo: $repo, tool_commit: $sha, workflow_run: $run, tag: $tag}' > build-info.json
+          # Same repository: tag the built commit. Rules repository: its default branch (the tool commit is not there).
+          target=()
+          [ "$CROSS" = "true" ] || target=(--target "$TARGET")
+          gh release create "$TAG" release/* build-info.json --draft "${target[@]}" \
+            --title "Suricata rules $TAG" --notes-file release/RELEASE_NOTES.md
+          gh release edit "$TAG" --draft=false --latest
+          echo "- published \`$TAG\` to \`$GH_REPO\`: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      # Keeps the newest KEEP_RELEASES releases plus the first release of each of the newest KEEP_MONTHLY months;
+      # deletes only rules-YYYY-MM-DD[.N] tags (anything else in the repository is left alone).
+      - name: Prune old releases
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --limit 400 --exclude-drafts --json tagName \
+            | jq -r --argjson keep "$KEEP_RELEASES" --argjson months "$KEEP_MONTHLY" '
+                [.[].tagName | select(test("^rules-[0-9]{4}-[0-9]{2}-[0-9]{2}(\\.[0-9]+)?$"))] as $all
+                | ($all[:$keep]) as $recent
+                | ([$all | group_by(.[6:13])[] | min] | sort | reverse | .[:$months]) as $monthly
+                | ($all - $recent - $monthly)[]' \
+            | while read -r old; do echo "delete $old"; gh release delete "$old" --yes --cleanup-tag; done
+
+  # Pages of this repository only while the rulesets are published here; with a rules repository, its own pages.yml
+  # runs on the `release: published` event (App-token releases fire it, GITHUB_TOKEN ones do not).
+  pages:
+    needs: publish
+    if: >-
+      always() && needs.publish.result == 'success' && vars.SURIHARVEST_PAGES_ENABLED == 'true' &&
+      (vars.SURIHARVEST_RULES_REPO == '' || vars.SURIHARVEST_RULES_REPO == github.repository)
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+
+  # Keeps the repo "active" (scheduled workflows are disabled after 60 days without activity) and keeps a
+  # browsable history of counts on a separate branch, so main never gets automated commits.
+  keepalive:
+    needs: [build, verify, publish]
+    if: >-
+      always() && needs.build.result == 'success' &&
+      needs.verify.result != 'failure' && needs.publish.result != 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      STATS_BRANCH: ${{ vars.SURIHARVEST_STATS_BRANCH || 'data' }}
+      HEARTBEAT_DAYS: '25'
+      CHANGED: ${{ needs.build.outputs.changed }}
+      TAG: ${{ needs.publish.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: release
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          fetch-depth: 1
+          persist-credentials: false # the token goes to the fetch/push below only
+
+      - name: Commit stats to the stats branch
+        working-directory: repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          gitauth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth")
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git "${gitauth[@]}" fetch --depth 1 origin "$STATS_BRANCH" 2>/dev/null; then
+            git switch -C "$STATS_BRANCH" FETCH_HEAD
+            last=$(git log -1 --format=%ct)
+          else
+            git switch --orphan "$STATS_BRANCH"
+            git rm -rfq . || true
+            last=0
+          fi
+          mkdir -p stats
+          cp ../release/stats.json stats/latest.json
+          if [ "$CHANGED" = "true" ] && [ -n "$TAG" ]; then
+            jq -c --arg tag "$TAG" '. + {tag: $tag}' ../release/stats.json >> stats/history.jsonl
+          fi
+          age_days=$(( ($(date +%s) - last) / 86400 ))
+          git add stats
+          if git diff --cached --quiet && [ "$age_days" -lt "$HEARTBEAT_DAYS" ]; then
+            echo "nothing to commit (last commit ${age_days}d ago)"; exit 0
+          fi
+          git commit -q --allow-empty -m "stats: $(date -u +%F) ${TAG:-no release} [skip ci]"
+          git "${gitauth[@]}" push origin "HEAD:$STATS_BRANCH"
+
+  # A failed scheduled night (fetch, gate, verify, publish) opens or updates one tracking issue.
+  notify:
+    needs: [build, verify, state, sign, publish]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - run: |
+          set -euo pipefail
+          gh label create nightly-failure --color B60205 --description "nightly build failed" 2>/dev/null || true
+          body="Nightly run failed on $(date -u +%F): $RUN_URL (diagnostics artifact attached to the run). Nothing was published; the previous release in $RULES_REPO stays latest."
+          num=$(gh issue list --label nightly-failure --state open --json number --jq '.[0].number // ""')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body "$body"
+          else
+            gh issue create --title "Nightly build failing" --label nightly-failure --body "$body"
+          fi

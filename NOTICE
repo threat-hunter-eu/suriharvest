@@ -1,0 +1,46 @@
+suriharvest
+Copyright (c) 2026 suriharvest contributors
+
+The suriharvest source code (src/, scripts/, tests/, docs/, deploy/) is released under the MIT License; see LICENSE.
+
+Third-party rules
+-----------------
+suriharvest does not include third-party Suricata rules in this repository. It downloads them from the sources
+listed in src/suriharvest/catalog/sources.yaml, each under its publisher's own licence (recorded per source in
+that file and shown on the Sources page of `suriharvest serve`). Rules keep their publisher's licence; they are not relicensed
+under MIT.
+
+Release archives built by suriharvest (`suriharvest release build`, the nightly GitHub release) redistribute
+only sources whose licence allows it, and ship with:
+  - NOTICE.md     the sources in that build, their licences, and the publishers' copyright notices verbatim
+                  (for example Emerging Threats Open and OISF rules);
+  - LICENSES/     the full licence texts that apply to those sources.
+
+Licence texts bundled with the package
+--------------------------------------
+src/suriharvest/licences/ holds unmodified copies of the standard licence texts (SPDX license-list-data: 0BSD,
+AGPL-3.0-only, Apache-2.0, BSD-2-Clause, BSD-3-Clause, BSD-4-Clause, CC-BY-3.0, CC-BY-4.0, CC-BY-SA-3.0,
+CC-BY-SA-4.0, CC-BY-NC-SA-4.0, CC0-1.0, EPL-1.0, EPL-2.0, EUPL-1.1, EUPL-1.2, GPL-2.0-only, GPL-3.0-only, ISC,
+LGPL-2.1-only, LGPL-3.0-only, MIT, MPL-2.0, Python-2.0, Unlicense, Zlib) so that release archives can carry
+them. Each text remains under its own terms. `release build` stops when a published source names a licence whose
+text is not bundled here.
+
+Bundled third-party material
+----------------------------
+src/suriharvest/web/static/fonts/: the fonts of the web UI and the static site, under the SIL Open Font License
+  1.1 (the licence texts ship next to them):
+  - Atkinson Hyperlegible Next, Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors
+    (AtkinsonHyperlegibleNext-OFL.txt);
+  - Atkinson Hyperlegible Mono, Copyright 2020-2024 The Atkinson Hyperlegible Mono Project Authors
+    (AtkinsonHyperlegibleMono-OFL.txt);
+  - Archivo, Copyright 2020 The Archivo Project Authors (Archivo-OFL.txt).
+src/suriharvest/catalog/sid-allocation.tsv: a copy of the sid allocation table of https://sidallocation.org/
+  (https://github.com/sidallocation/sidallocation.org, which states no licence), fetched 2026-11-14. It records
+  facts (sid ranges and the publishers they are allocated to), used to keep a publisher's sids with it; the file's
+  first line names the source.
+src/suriharvest/release_extras.py: the default reference.config entries (URL prefixes such as "bugtraq",
+  "cve", "url") as Suricata ships them (GPL-2.0, https://github.com/OISF/suricata), a short factual list.
+
+Test fixtures: tests/acceptance/fixtures/ holds small synthetic rules written for the tests (licence
+noted in each fixture);
+tests/fixtures/oisf-index.yaml is an excerpt of the public OISF suricata-update source index (free entries only).

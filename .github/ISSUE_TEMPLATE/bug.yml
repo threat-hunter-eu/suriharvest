@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in suriharvest does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems: please use the Security tab (private report), not an issue. See SECURITY.md.
+        Rule content problems (false positives, wrong msg) belong to the rule's publisher.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands you ran (with output). Remove tokens, internal hostnames and private paths first.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: suriharvest --version
+    validations:
+      required: true
+  - type: input
+    id: suricata
+    attributes:
+      label: suricata -V (or the engine image)
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else (rule keys from `suriharvest search`, `suriharvest runs show latest`, OS)

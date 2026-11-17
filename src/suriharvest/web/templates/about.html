@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, lic_class, copy_btn %}
+{% block title %}About & licences{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>About &amp; licences</h1><p class="lede">suriharvest {{ version }} &middot; workspace <code>{{ home }}</code></p></div>
+</div>
+<div class="rule-layout">
+  <div class="stack">
+    <section class="card" id="what" aria-labelledby="h-what">
+      <div class="card-head"><h2 id="h-what">What suriharvest does</h2></div>
+      <div class="card-body">
+        <p>It downloads free Suricata rulesets, parses every rule, checks that it loads in a real Suricata (<code class="nowrap">suricata -T</code>), merges copies and mirrors into one entry per rule, and builds the rulesets you define as profiles. Nothing leaves your machine except the source downloads.</p>
+        <ol class="match-steps">
+          <li><span><b>Sources</b>: tarballs, files and git repositories from <code>sources.yaml</code></span></li>
+          <li><span><b>Parse</b>: one entry per rule text; lines that do not parse are quarantined, never dropped silently</span></li>
+          <li><span><b><code class="nowrap">suricata -T</code></b> in every engine of <code>suriharvest.yaml</code>, cached by rule text</span></li>
+          <li><span><b>Dedupe</b>: identical logic from several sources becomes one rule, with every copy and its licence</span></li>
+          <li><span><b>Profiles</b>: a search, an engine and your exclusions</span></li>
+          <li><span><b>Builds</b>: <code>suricata.rules</code>, what changed, what was left out and why</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="card" id="licences" aria-labelledby="h-lic">
+      <div class="card-head"><h2 id="h-lic">Licences</h2></div>
+      <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Class</th><th scope="col">Examples</th><th scope="col">May you share it?</th><th scope="col">What export does</th></tr></thead><tbody>
+        <tr><td>{{ lic_class('permissive') }}</td><td class="small">BSD, MIT, Apache-2.0, CC0, CC-BY</td><td class="small">Yes, keep the notice</td><td class="small">Exported; NOTICE.md lists the source</td></tr>
+        <tr><td>{{ lic_class('copyleft') }}</td><td class="small">GPL-2.0, GPL-3.0, CC-BY-SA</td><td class="small">Yes, under the same licence</td><td class="small">Exported; keep the licence with the file</td></tr>
+        <tr><td>{{ lic_class('restricted') }}</td><td class="small">CC-BY-NC, custom terms, <code>redistribute: no</code></td><td class="small">No: your own sensors only</td><td class="small">Exported for you; dropped by "Only rules I may share"</td></tr>
+        <tr><td>{{ lic_class('none') }}</td><td class="small">no licence stated</td><td class="small">No</td><td class="small">Treated like own use only</td></tr>
+      </tbody></table></div>
+      <div class="card-foot">ET Open ships two licences in one tarball: rules named <code>ET ...</code> are BSD, rules named <code>GPL ...</code> are GPL-2.0. suriharvest shows each rule with its own. Check the publisher's terms before you publish a build.</div>
+    </section>
+
+    <section class="card" id="sids" aria-labelledby="h-sids">
+      <div class="card-head"><h2 id="h-sids">Sids</h2></div>
+      <div class="card-body small">
+        <p>Suricata loads one rule per <code>gid:sid</code>. Who owns a sid comes from the public allocation table at <a href="https://sidallocation.org/" rel="noreferrer noopener" target="_blank">sidallocation.org</a>: a rule inside a publisher's range is that publisher's rule, wherever it was found (rule key <code>namespace:gid:sid</code>, the newest rev wins between copies).</p>
+        <p>When two different rules share a sid, the best one keeps it and the others get new sids from <code>remap_base</code> (now <code>{{ remap_base|num }}</code>, outside every allocated range). Every decision is written to <code>state/sid-map.tsv</code>, so a remapped sid never moves between builds: alerts, suppressions and thresholds keep working.</p>
+        <p class="mb-0">Rules whose sid was remapped: <a href="/search?q=remapped:yes">remapped:yes</a>.</p>
+      </div>
+    </section>
+
+    <section class="card" id="syntax" aria-labelledby="h-syntax">
+      <div class="card-head"><h2 id="h-syntax">Search syntax</h2><span class="xs muted">words search the name, contents, metadata and references</span></div>
+      <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Filter</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead><tbody>
+        {% for f, meaning, ex in [
+          ('words, "a phrase"', 'full-text search', '"cobalt strike"'),
+          ('sid:', 'a sid (any namespace)', 'sid:2024897'),
+          ('key:', 'a rule key namespace:gid:sid', 'key:et:1:2024897'),
+          ('cve:', 'a CVE in references or metadata; cve:* = any', 'cve:CVE-2021-44228'),
+          ('app: proto: buffer:', 'app-layer, header protocol, sticky buffer', 'app:tls buffer:ja3.hash'),
+          ('classtype: severity:', 'classtype; signature_severity (lists with commas, unrated)', 'severity:critical,major'),
+          ('source: licence:', 'carried by a source (a,b = either); licence class', 'source:et-open licence:copyleft'),
+          ('ioc:', 'yes, no or an indicator type (domain ip url ja3 cert_fingerprint dataset)', 'ioc:ja3'),
+          ('flowbits:', 'sets or checks this flowbit', 'flowbits:ET.http.binary'),
+          ('metadata:', 'a metadata key=value, or a key alone', 'metadata:malware_family=Cobalt_Strike'),
+          ('loads: fails:', 'checked in an engine (short names: 7, 8)', 'fails:7'),
+          ('flag:', 'missing_setter, needs_files, deprecated, retired, no_prefilter_content', 'flag:missing_setter'),
+          ('dialect:', 'suricata, both or snort', 'dialect:both'),
+          ('cat: mitre: enabled:', 'name category, ATT&CK id, enabled upstream', 'cat:"ET INFO"'),
+          ('remapped:', 'the sid clashed and was remapped', 'remapped:yes'),
+          ('updated> score>=', 'updated after a date; ranking score', 'updated>2026-01-01')] %}
+        <tr><td class="mono small">{{ f }}</td><td class="small">{{ meaning }}</td><td><a class="mono small" href="/search?q={{ ex|urlencode }}">{{ ex }}</a></td></tr>
+        {% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section class="card" id="cli" aria-labelledby="h-cli">
+      <div class="card-head"><h2 id="h-cli">Command line</h2>{{ copy_btn('#cli-text') }}</div>
+      <pre class="code" id="cli-text"><span class="l">suriharvest init --preset core          # new workspace in this folder (core | community | all)</span><span class="l">suriharvest update                      # download, check, index, gates, rebuild profiles</span><span class="l">suriharvest sync et-open                # one source only</span><span class="l">suriharvest validate                    # suricata -T on every new rule (cached)</span><span class="l">suriharvest sources list</span><span class="l">suriharvest sources add my-rules https://github.com/OWNER/REPO --type git --licence MIT --redistribute yes</span><span class="l">suriharvest search 'cobalt strike app:http ioc:no'</span><span class="l">suriharvest show 2024897</span><span class="l">suriharvest profile exclude default 'ET INFO' --reason 'noise'</span><span class="l">suriharvest profile build default       # data/profiles/default/&lt;time&gt;/suricata.rules</span><span class="l">suriharvest profile diff default        # previous build -&gt; latest</span><span class="l">suriharvest export 'source:et-open' --out out/ --by-source --redistributable-only</span><span class="l">suriharvest runs accept latest          # a failed gate was an intended change</span><span class="l">suriharvest serve                         # this page</span></pre>
+    </section>
+
+    <section class="card" id="daily" aria-labelledby="h-daily">
+      <div class="card-head"><h2 id="h-daily">Daily work in the browser</h2></div>
+      <div class="card-body small"><ol class="match-steps">
+        <li><span><b>Overview &rarr; Download new rules</b>: every enabled source, checked in Suricata, every profile rebuilt. <b>Sources &rarr; Download only this</b> does it for one source.</span></li>
+        <li><span><b>Builds &amp; changes &rarr; New to review</b>: what a profile would get that is not in its last build. Tick what you do not want and exclude it.</span></li>
+        <li><span><b>Profiles &amp; exclusions</b>: add by name, or search and tick rules; also in <code>exclusions/&lt;profile&gt;.yaml</code>. <b>Rebuild now</b> applies it.</span></li>
+        <li><span><b>Export</b>: <code>suricata.rules</code>, one file per source, or a <code>suricata-update</code> URL.</span></li>
+      </ol></div>
+    </section>
+  </div>
+  <aside class="stack" aria-label="On this page">
+    <section class="card side-card"><div class="card-head"><h2>On this page</h2></div><div class="card-body"><ul class="rel-list">
+      <li><a href="#what">What suriharvest does</a></li><li><a href="#licences">Licences</a></li><li><a href="#sids">Sids</a></li><li><a href="#syntax">Search syntax</a></li><li><a href="#cli">Command line</a></li><li><a href="#daily">Daily work in the browser</a></li><li><a href="#privacy">Data and privacy</a></li>
+    </ul></div></section>
+    <section class="card side-card" id="privacy"><div class="card-head"><h2>Data and privacy</h2></div><div class="card-body small">
+      <p>Everything stays in the workspace: the database, the downloaded rules and the builds. The only network calls are the source downloads (and Docker images for container engines).</p>
+      <p class="mb-0">This server listens on 127.0.0.1 by default; on another address it asks for a token.</p></div></section>
+    <section class="card side-card" id="credits"><div class="card-head"><h2>Credits and trademarks</h2></div><div class="card-body small">
+      <p>The rules are the work of their publishers (Emerging Threats Open, abuse.ch, Stamus Networks and the others under <a href="/sources">Sources</a>); every build keeps their licences and copyright lines.</p>
+      <p>{{ not_affiliated }} {{ trademarks }}</p>
+      <p class="mb-0">A rule of yours is listed wrongly, or you want it removed from the published builds? <a href="{{ issues_url }}" rel="noopener noreferrer">Open an issue</a>{% if contact_email %} or write to {{ contact_email }}{% endif %}.</p></div></section>
+    <section class="card side-card"><div class="card-head"><h2>This installation</h2></div><div class="card-body"><dl class="kv">
+      <dt>Version</dt><dd>{{ version }}</dd>
+      <dt>Workspace</dt><dd class="mono xs">{{ home }}</dd>
+      <dt>Engines</dt><dd>{% for e in engines %}<span class="mono xs">{{ e.name }}</span> <span class="muted xs">{{ e.image or e.binary }}</span>{% if not loop.last %}<br>{% endif %}{% else %}none{% endfor %}</dd>
+      <dt>Sources</dt><dd>{{ srcs|length }}</dd>
+    </dl></div></section>
+  </aside>
+</div>
+{% endblock %}

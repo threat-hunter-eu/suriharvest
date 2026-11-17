@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, lic, eng, when, token, copy_btn %}
+{% block title %}Profiles & exclusions{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Profiles &amp; exclusions</h1><p class="lede">A profile is a named ruleset: which rules (a search), which Suricata they must load in, and what you leave out, each exclusion with its reason. Every download rebuilds them.</p></div>
+</div>
+{% if cards %}
+<div class="grid-2">
+{% for c in cards %}{% set t, b = c.t, c.b %}{% set o = t.options or {} %}
+<section class="card" aria-labelledby="p-{{ loop.index }}">
+  <div class="card-head"><h2 id="p-{{ loop.index }}">{{ t.name }} {% if t.description %}<span class="sub">{{ t.description }}</span>{% endif %}</h2>
+    <span class="row">{% if t.engine %}{{ eng(t.engine, [t.engine], []) }}{% else %}<span class="badge badge-outline">any engine</span>{% endif %}{% if o.get('redistributable_only') %}{{ lic('shareable', 'permissive') }}{% endif %}</span></div>
+  <div class="card-body">
+    <dl class="kv">
+      <dt>Rules</dt><dd>{% if t.query %}<a class="mono" href="/search?q={{ t.query|urlencode }}">{{ t.query }}</a>{% else %}every rule in the index{% endif %}{% if t.unit == 'family' %} <span class="muted xs">(one per family)</span>{% endif %}</dd>
+      <dt>Options</dt><dd class="small">{{ 'fix sid clashes' if o.get('remap_sids', true) else 'sid clashes stop the build' }}{% if o.get('redistributable_only') %} &middot; only rules you may share{% endif %}{% if o.get('include_disabled') %} &middot; includes rules disabled upstream{% endif %}{% if o.get('iocs_as_datasets') %} &middot; IOC rules as datasets{% endif %}</dd>
+      <dt>Last build</dt><dd>{% if b %}<a href="/builds?profile={{ t.name }}">#{{ b.id }}</a>, {{ b.rules|num }} rules, {{ when(b.created_at) }}{% if b.summary.previous_build %} <span class="xs"><span class="diff-add">+{{ b.summary.added|num }}</span> <span class="diff-del">&minus;{{ b.summary.removed|num }}</span></span>{% endif %}{% else %}No build yet{% endif %}</dd>
+      <dt>Exclusions</dt><dd><a href="/profiles/{{ t.name }}/exclusions">{{ c.n_excl }} exclusion{{ 's' if c.n_excl != 1 }}</a>{% if b %} keep {{ b.excluded|num }} rules out{% endif %}<div class="mono xs muted">{{ c.efile }}</div></dd>
+      {% set ov = (o.get('enable') or [])|length + (o.get('modify') or [])|length + (o.get('thresholds') or [])|length %}{% if ov %}<dt>Overrides</dt><dd><a href="/profiles/{{ t.name }}/exclusions#h-ov">{{ (o.get('enable') or [])|length }} enable, {{ (o.get('modify') or [])|length }} modify, {{ (o.get('thresholds') or [])|length }} thresholds</a>{% if b and b.summary.modified %} &middot; {{ b.summary.modified|num }} rules modified{% endif %}{% if b and b.summary.threshold_lines %} &middot; {{ b.summary.threshold_lines|num }} threshold lines{% endif %}</dd>{% endif %}
+    </dl>
+    <div class="actions mt-4">
+      {% if b %}<a class="btn btn-primary btn-sm" href="/profiles/{{ t.name }}/builds/{{ b.id }}/suricata.rules">{{ icon('export') }}suricata.rules</a>{% endif %}
+      {% if b and c.new %}<a class="btn btn-sm" href="/profiles/{{ t.name }}/new">Review {{ c.new|num }} new</a>{% elif b %}<a class="btn btn-sm" href="/profiles/{{ t.name }}/new">Review new</a>{% endif %}
+      <a class="btn btn-sm" href="/profiles/{{ t.name }}/exclusions">{{ icon('filter') }}Exclusions</a>
+      <form action="/profiles/{{ t.name }}/build" method="post">{{ token() }}<button class="btn btn-sm{{ ' btn-primary' if not b }}" type="submit" title="remake the ruleset from the rules already downloaded (after changing exclusions)"{% if running %} disabled{% endif %}>{{ icon('builds') }}{{ 'Rebuild now' if b else 'Build now' }}</button></form>
+      <a class="btn btn-quiet btn-sm" href="/export?profile={{ t.name }}">Export&hellip;</a>
+    </div>
+  </div>
+</section>
+{% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="empty"><h2>No profile yet</h2><p>Create one from the command line; it shows up here with its builds and exclusions.</p></div></div>
+{% endif %}
+<p class="small muted mt-6">New profile: <code id="c-new">suriharvest profile create NAME --query 'source:et-open'{% if hint_engine %} --engine {{ hint_engine }}{% endif %}</code> {{ copy_btn('#c-new', 'Copy', 'btn btn-quiet btn-sm') }}</p>
+{% endblock %}

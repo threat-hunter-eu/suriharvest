@@ -1,0 +1,18 @@
+{% extends "site_base.html" %}
+{% block title %}Sources{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Sources</h1><p class="lede">{{ sources|length }} source{{ 's' if sources|length != 1 }} in this release. Each rule keeps its publisher's licence; see <a href="notice.html">the notice</a>.</p></div></div>
+<table class="rows">
+<thead><tr><th scope="col">Source</th><th scope="col">Licence</th><th scope="col">May share</th><th scope="col">Status</th>{% for e, v in engines %}<th scope="col" class="num">{{ e|eng_label }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for src in sources %}
+<tr>
+  <td><a href="search.html?q=source:{{ src.name|urlencode }}"><b>{{ src.name }}</b></a>{% if src.url %}<div class="xs muted mono">{{ src.url }}</div>{% endif %}</td>
+  <td>{% for l in src.licence|licence_links %}{% if l.url %}<a href="{{ l.url }}" rel="noopener">{{ l.id }}</a>{% else %}{{ l.id }}{% endif %}{% else %}unknown{% endfor %}</td>
+  <td class="small">{{ src.redistribute or 'unknown' }}</td>
+  <td class="small">{{ src.status or '' }}</td>
+  {% for e, v in engines %}<td class="num">{{ (src.rules or {}).get(e, 0)|num }}</td>{% endfor %}
+</tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

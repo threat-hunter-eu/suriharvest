@@ -1,0 +1,53 @@
+{% from "_ui.html" import icon %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="{{ csp|safe }}">
+<meta name="referrer" content="same-origin">
+<title>{% block title %}suriharvest{% endblock %} - suriharvest rules{% if tag %} {{ tag }}{% endif %}</title>
+{% if site_url %}<link rel="canonical" href="{{ site_url }}{{ base }}{{ '' if page == 'index.html' else page }}">{% endif %}
+<script src="{{ static_root }}/theme.js"></script>
+<link rel="stylesheet" href="{{ static_root }}/harvest-base.css">
+<link rel="stylesheet" href="{{ static_root }}/style.css">
+<link rel="icon" href="{{ static_root }}/favicon.svg" type="image/svg+xml">
+<script src="{{ static_root }}/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+  <nav class="side" aria-label="Main">
+    <a class="brand" href="{{ base }}"><span class="brand-mark">{{ icon('harvest') }}</span><span>suriharvest<small>Published Suricata rules</small></span></a>
+    <ul class="nav">
+      {% for key, href, ico, label in [
+        ('overview', 'index.html', 'overview', 'Overview'),
+        ('search', 'search.html', 'search', 'Search'),
+        ('sources', 'sources.html', 'sources', 'Sources'),
+        ('changes', 'changes.html', 'changes', 'Changes'),
+        ('validation', 'validation.html', 'engine', 'Suricata check'),
+        ('notice', 'notice.html', 'licence', 'Licences & notice')] %}
+      <li><a href="{{ base }}{{ '' if href == 'index.html' else href }}"{% if section == key %} aria-current="page"{% endif %}>{{ icon(ico) }}<span>{{ label }}</span></a></li>
+      {% endfor %}
+    </ul>
+    <p class="side-status">{% if tag %}Release <b>{{ tag }}</b><br>{% endif %}{% if generated %}Built {{ generated }}{% endif %}
+      {% for e, v in (summary.engines or {})|dictsort %}{% if loop.first %}<br>Checked on {% endif %}Suricata {{ v.version or e|eng_short }}{% if not loop.last %} and {% endif %}{% endfor %}</p>
+    <ul class="nav nav-foot">
+      <li><button type="button" class="js-only" data-action="theme" aria-label="Switch colour theme">{{ icon('theme') }}<span data-theme-label>Theme: auto</span></button></li>
+    </ul>
+  </nav>
+  <div class="frame">
+    <header class="topbar">
+      <form class="searchbar" action="{{ base }}search.html" method="get" role="search">{{ icon('search') }}
+        <input type="search" name="q" autocomplete="off" spellcheck="false" placeholder="Search published rules: message words, sid, source" aria-label="Search rules">
+      </form>
+    </header>
+    <main id="main" class="page" tabindex="-1">
+      {% block content %}{% endblock %}
+      <p class="xs muted mt-4">Static, read-only view of the release files{% if tag %} of <b>{{ tag }}</b>{% endif %}, made by suriharvest {{ version }}. Rule text is not shown here: download the rules from the release.</p>
+      <p class="xs muted">{{ not_affiliated }} {{ trademarks }} Corrections and removal requests: <a href="{{ issues_url }}">open an issue</a>{% if contact_email %} or write to {{ contact_email }}{% endif %}.</p>
+    </main>
+  </div>
+</div>
+</body>
+</html>

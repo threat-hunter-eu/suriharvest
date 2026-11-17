@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, token, crumbs %}
+{% block title %}Exclusions: {{ t.name }}{% endblock %}
+{% block content %}
+{{ crumbs([('Profiles', '/profiles'), (t.name, none), ('Exclusions', none)]) }}
+<div class="page-head">
+  <div><h1>Exclusions for {{ t.name }}</h1><p class="lede">Rules excluded here never go to {{ t.name }}. Also stored in <code>{{ efile }}</code> (edit it by hand if you like). Changes apply at the next build.</p></div>
+  <div class="actions"><a class="btn" href="/builds?profile={{ t.name }}">{{ icon('changes') }}Builds</a></div>
+</div>
+{% if msg %}<div class="notice" role="status">{{ icon('check') }}<p>{{ msg }}</p><form action="/profiles/{{ t.name }}/build" method="post" class="mb-0">{{ token() }}<button class="btn btn-sm btn-primary" type="submit"{% if running %} disabled{% endif %}>{{ icon('builds') }}Rebuild now</button></form></div>{% endif %}
+
+<div class="grid-2">
+<section class="card" aria-labelledby="h-add">
+  <div class="card-head"><h2 id="h-add">Add by name</h2></div>
+  <div class="card-body">
+  <form method="post" action="/profiles/{{ t.name }}/exclusions/by-name" class="stack">{{ token() }}
+    <label class="field">Rule name, or part of it <input name="value" required placeholder="ET INFO Microsoft Connection Test"></label>
+    <label class="field">Reason <input name="reason" placeholder="noisy on our network"></label>
+    <details><summary class="small muted">Options</summary>
+      <div class="stack mt-2">
+      <label class="field">Match <select name="kind">
+        <option value="msg_contains">name contains (case-sensitive)</option>
+        <option value="msg_exact">name is exactly</option>
+        <option value="msg_regex">name matches regular expression</option>
+        <option value="category">name category (e.g. ET INFO)</option>
+        <option value="sid">sid</option>
+        <option value="classtype">classtype</option>
+      </select></label>
+      <label class="check small"><input type="checkbox" name="scope" value="all"> for every profile, not only {{ t.name }}</label>
+      </div>
+    </details>
+    <div><button class="btn btn-primary" type="submit">{{ icon('filter') }}Add exclusion</button></div>
+  </form>
+  </div>
+</section>
+<section class="card" aria-labelledby="h-find">
+  <div class="card-head"><h2 id="h-find">Search and select</h2></div>
+  <div class="card-body">
+  <form method="get" action="/profiles/{{ t.name }}/exclusions" class="stack">
+    <label class="field">Search {{ t.name }}'s rules <input name="q" value="{{ q }}" placeholder='words, sid:2024897, cat:"ET INFO", source:et-open, ioc:yes'></label>
+    <div><button class="btn" type="submit">{{ icon('search') }}Search</button></div>
+  </form>
+  <p class="small muted mt-4 mb-0">Searches only the rules this profile would get. Tick rules and exclude them, or exclude the whole search so future matching rules stay out too.</p>
+  </div>
+</section>
+</div>
+
+{% if q %}
+<section class="card mt-6" aria-labelledby="h-res">
+  {% if error %}<div class="card-body"><div class="notice notice-warn mb-0">{{ icon('alert') }}<p>{{ error }}</p></div></div>{% else %}
+  <div class="card-head"><h2 id="h-res">{{ total|num }} rule(s) match <code>{{ q }}</code>{% if total > 200 %} <span class="sub">page {{ page }}</span>{% endif %}</h2></div>
+  <form method="post" action="/profiles/{{ t.name }}/exclusions/selected">{{ token() }}<input type="hidden" name="q" value="{{ q }}">
+  <div class="card-body row">
+    <label class="check small js-only"><input type="checkbox" id="check-all"> select all on this page</label>
+    <input name="reason" placeholder="reason" aria-label="reason">
+    <button class="btn btn-primary" type="submit">Exclude selected</button>
+    <button class="btn" name="whole" value="1" type="submit" title="a standing exclusion: rules matching this search later are excluded too">Exclude the whole search ({{ total|num }})</button>
+  </div>
+  <div class="table-scroll"><table class="rows" id="results"><thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">sid</th><th scope="col">Rule</th><th scope="col">Category</th><th scope="col">Source</th><th scope="col" class="num">Score</th><th scope="col">Status</th></tr></thead><tbody>
+  {% for g in rows %}{% set stt = state.get(g.logic_hash) %}
+  <tr data-key="{{ g.logic_hash }}" tabindex="-1"><td>{% if not stt %}<input type="checkbox" name="keys" value="{{ g.rule_key }}" aria-label="select {{ g.sid }}">{% endif %}</td>
+  <td class="mono">{{ g.sid }}</td><td><a class="open" href="/rule/{{ g.logic_hash }}">{{ g.msg }}</a></td><td class="small">{{ g.category or '' }}</td><td class="small">{{ g.canonical_source }}</td><td class="num">{{ g.score }}</td>
+  <td>{% if stt %}<span class="badge flag-warn" title="{{ stt }}">excluded</span>{% endif %}</td></tr>
+  {% endfor %}</tbody></table></div>
+  </form>
+  {% if page > 1 or total > page * 200 %}<nav class="pager">{% if page > 1 %}<a class="btn btn-sm" href="?q={{ q|urlencode }}&page={{ page - 1 }}">Previous</a>{% endif %}{% if total > page * 200 %}<a class="btn btn-sm" href="?q={{ q|urlencode }}&page={{ page + 1 }}">Next</a>{% endif %}</nav>{% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card mt-6" aria-labelledby="h-cur">
+  <div class="card-head"><h2 id="h-cur">Current exclusions ({{ exclusions|length }})</h2><span class="xs muted mono">{{ efile }}</span></div>
+  <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Match</th><th scope="col">Value</th><th scope="col" class="num">Rules at last build</th><th scope="col">Reason</th><th scope="col">By / when</th><th scope="col">Scope</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead><tbody>
+  {% for ex in exclusions %}<tr><td><span class="badge kw">{{ ex.kind }}</span></td><td class="mono small">{{ ex.value }}</td><td class="num">{{ ex.last_matched|num }}</td><td class="small">{{ ex.reason or '' }}</td>
+  <td class="small muted">{{ ex.author or '' }} {{ ex.created_at.strftime('%Y-%m-%d') }}</td><td class="small">{{ 'all profiles' if ex.profile_id is none else t.name }}</td>
+  <td><form method="post" action="/profiles/{{ t.name }}/exclusions/{{ ex.id }}/delete">{{ token() }}<button class="btn btn-sm" type="submit">Remove</button></form></td></tr>
+  {% else %}<tr><td colspan="7" class="muted">None yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+{% if overrides %}
+<section class="card mt-6" aria-labelledby="h-ov">
+  <div class="card-head"><h2 id="h-ov">Overrides ({{ overrides|length }})</h2><span class="xs muted">enable, modify and thresholds entries in {{ efile }}; an enable entry with "beats exclusions" keeps a rule an exclusion matches</span></div>
+  <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Entry</th><th scope="col">Match</th><th scope="col">Value</th><th scope="col">Does</th><th scope="col" class="num">Rules at last build</th><th scope="col">Reason</th></tr></thead><tbody>
+  {% for o in overrides %}<tr><td class="small">{{ o.entry }}</td><td><span class="badge kw">{{ o.kind }}</span></td><td class="mono small">{{ o.value }}</td><td class="mono small">{{ o.does }}</td><td class="num">{{ o.hits }}</td><td class="small">{{ o.reason }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+{% endblock %}

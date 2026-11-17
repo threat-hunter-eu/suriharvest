@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, when, run_status, crumbs %}
+{% block title %}Update {{ run.id }}{% endblock %}
+{% block content %}
+{{ crumbs([('Builds & changes', '/builds'), ('Update runs', '/builds#runs'), ('#' ~ run.id, none)]) }}
+<div class="page-head">
+  <div><h1>Update #{{ run.id }} {{ run_status(run) }}</h1><p class="lede">{{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC ({{ when(run.started_at) }}){% if run.report_path %} &middot; report <code>{{ run.report_path.split('/')[-1] }}</code>{% endif %}</p></div>
+  {% if run.status != 'passed' and not run.accepted %}<div class="actions"><div class="cmd"><code id="c-acc">suriharvest runs accept {{ run.id }}</code></div></div>{% endif %}
+</div>
+{% if run.error %}<div class="notice notice-warn">{{ icon('alert') }}<p>{{ run.error }}</p></div>{% endif %}
+<div class="dash">
+  <div class="stack">
+    <section class="card"><div class="card-head"><h2>Gates</h2><span class="xs muted">checks that stop a bad update from becoming the baseline</span></div>
+      <div class="table-scroll"><table class="rows"><tbody>{% for gt in run.gates %}<tr><td><span class="badge {{ {'pass': 'val-valid', 'fail': 'val-invalid'}.get(gt.status, 'badge-outline') }}">{{ gt.status }}</span></td><td><b>{{ gt.name }}</b></td><td class="small">{{ gt.detail }}</td></tr>{% else %}<tr><td class="muted">No gates ran.</td></tr>{% endfor %}</tbody></table></div></section>
+    {% if run.changes %}
+    <section class="card"><div class="card-head"><h2>What changed</h2><span class="small">{{ run.changes.new_logic|num }} new &middot; {{ run.changes.gone_logic|num }} gone</span></div>
+      {% if run.changes.per_source %}<div class="table-scroll"><table class="rows"><thead><tr><th scope="col">Source</th><th scope="col" class="num">Added</th><th scope="col" class="num">Removed</th></tr></thead><tbody>
+      {% for src, d in run.changes.per_source.items() %}<tr><td><a href="/sources/{{ src }}">{{ src }}</a></td><td class="num diff-add">+{{ d.added|num }}</td><td class="num diff-del">&minus;{{ d.removed|num }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+      <div class="card-body">
+      {% for title, key, kind in [('New rules (sample)', 'new_sample', 'new'), ('Gone (sample)', 'gone_sample', 'removed')] %}{% if run.changes[key] %}
+        <h3 class="mt-4 mb-0">{{ title }}</h3><ul class="changes mt-2">{% for r in run.changes[key][:25] %}<li><span class="kind kind-{{ kind }}">{{ kind }}</span><span>{% if kind == 'new' %}<a href="/rule/{{ r.logic_hash }}">{{ r.msg }}</a>{% else %}{{ r.msg }}{% endif %}<span class="meta mono">sid {{ r.sid }} rev {{ r.rev }}</span></span><span></span></li>{% endfor %}</ul>
+      {% endif %}{% endfor %}</div>
+    </section>
+    {% endif %}
+  </div>
+  <div class="stack">
+    <section class="card side-card"><div class="card-head"><h2>Steps</h2></div><div class="card-body"><dl class="kv">{% for k, v in run.steps.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></div></section>
+    <section class="card side-card"><div class="card-head"><h2>Corpus</h2></div><div class="card-body"><dl class="kv">{% for k, v in run.counts.items() %}<dt>{{ k|replace('_', ' ') }}</dt><dd>{{ v|num if v is number else v }}</dd>{% endfor %}</dl></div></section>
+  </div>
+</div>
+{% endblock %}

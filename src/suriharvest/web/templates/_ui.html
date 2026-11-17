@@ -1,0 +1,79 @@
+{# Small shared pieces: icons and badges. Every coloured badge carries a word. #}
+{% macro icon(name, cls="ico") %}<svg class="{{ cls }}" aria-hidden="true"><use href="{{ static_root|default('/static') }}/icons.svg#{{ name }}"/></svg>{% endmacro %}
+
+{% macro sev(severity) -%}
+{%- set s = (severity or '')|lower -%}
+{%- if s in ('critical', 'major', 'minor', 'informational') -%}
+<span class="badge sev sev-{{ s }}" title="signature_severity {{ severity }}">{{ s }}</span>
+{%- else -%}
+<span class="badge sev sev-none" title="No signature_severity in the rule metadata">unrated</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro lic(label, cls) -%}
+<span class="badge lic lic-{{ cls }}" title="{{ LIC_TITLES.get(cls, '') }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro lic_class(cls) -%}
+<span class="badge lic lic-{{ cls }}" title="{{ LIC_TITLES.get(cls, '') }}">{{ LIC_WORDS.get(cls, cls) }}</span>
+{%- endmacro %}
+
+{% macro eng(e, loads_in, fails_in) -%}
+{%- set n = e|eng_short -%}
+{%- if e in (loads_in or []) -%}
+<span class="badge eng eng-ok" title="{{ e|eng_label }}: loads" aria-label="{{ e|eng_label }}: loads"><b>{{ n }}</b>&#10003;</span>
+{%- elif e in (fails_in or []) -%}
+<span class="badge eng eng-fail" title="{{ e|eng_label }}: does not load" aria-label="{{ e|eng_label }}: does not load"><b>{{ n }}</b>&#10007;</span>
+{%- else -%}
+<span class="badge eng eng-na" title="{{ e|eng_label }}: not checked" aria-label="{{ e|eng_label }}: not checked"><b>{{ n }}</b>&ndash;</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro engs(engines, loads_in, fails_in) -%}
+<span class="engs">{% for e in engines %}{{ eng(e, loads_in, fails_in) }}{% endfor %}</span>
+{%- endmacro %}
+
+{% macro when(dt) -%}
+<span title="{{ dt|fulltime }}">{{ dt|reltime }}</span>
+{%- endmacro %}
+
+{% macro token() %}<input type="hidden" name="token" value="{{ csrf }}">{% endmacro %}
+
+{% macro copy_btn(target, label="Copy", cls="btn btn-sm") -%}
+<button type="button" class="{{ cls }} js-only" data-action="copy" data-target="{{ target }}">{{ icon('copy') }}{{ label }}</button>
+{%- endmacro %}
+
+{% macro run_status(r) -%}
+{%- set cls = {'passed': 'val-valid', 'failed': 'val-invalid', 'error': 'val-invalid', 'running': 'val-warnings'}.get(r.status, '') -%}
+<span class="badge {{ cls }}">{{ r.status }}</span>{% if r.accepted %} <span class="badge badge-outline">accepted</span>{% endif %}
+{%- endmacro %}
+
+{% macro crumbs(items) -%}
+<ol class="crumbs">{% for label, href in items %}<li>{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</li>{% endfor %}</ol>
+{%- endmacro %}
+
+{#- Overview charts (shared with suriharvest). ages: present.age_chart; t: present.spark. SVG geometry only, no inline style. -#}
+{% macro age_chart(ages, noun='rules') -%}
+<figure class="age" aria-labelledby="age-cap">
+  <figcaption id="age-cap"><b>Last changed</b> <span class="muted">{{ ages.share }}% of the {{ noun }} in the last 12 months</span></figcaption>
+  <div class="age-plot">
+    <svg class="age-bars" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="{{ noun|capitalize }} by the year they were last changed: {% for c in ages.cols %}{{ c.label }} {{ c.n|num }}{{ ', ' if not loop.last }}{% endfor %}">
+      <line class="age-base" x1="0" y1="100" x2="100" y2="100" vector-effect="non-scaling-stroke"/>
+      {%- for c in ages.cols %}<rect class="age-bar{% if c.now %} is-now{% endif %}" x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}"><title>{{ c.label }}: {{ c.n|num }} {{ noun if c.n != 1 else noun[:-1] }}</title></rect>{% endfor %}
+    </svg>
+    <ol class="age-axis" aria-hidden="true">{% for c in ages.cols %}<li{% if c.n == ages.peak and c.n %} class="is-peak"{% endif %}><b>{{ c.n|num }}</b><span>{{ c.short }}</span></li>{% endfor %}</ol>
+  </div>
+  {% if ages.unknown %}<p class="xs muted mb-0">{{ ages.unknown|num }} {{ noun ~ ' carry' if ages.unknown != 1 else noun[:-1] ~ ' carries' }} no date.</p>{% endif %}
+</figure>
+{%- endmacro %}
+
+{% macro spark(t, label) -%}
+{%- if t %}<span class="spark" title="{{ label }}"><svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polygon class="spark-area" points="{{ t.area }}"/><polyline class="spark-line" points="{{ t.points }}" vector-effect="non-scaling-stroke"/></svg><span class="xs muted">{{ label }}</span></span>{% endif -%}
+{%- endmacro %}
+
+{#- A 100% bar of the corpus split by one dimension (level, severity); parts: present.composition. -#}
+{% macro composition(parts, caption) -%}
+{%- if parts %}<div class="compo"><p class="compo-cap">{{ caption }}</p>
+  <div class="compo-bar" role="img" aria-label="{{ caption }}: {% for p in parts %}{{ p.label }} {{ p.n|num }}{{ ', ' if not loop.last }}{% endfor %}">{% for p in parts %}<span class="{{ p.cls }} {{ p.w }}" title="{{ p.label }}: {{ p.n|num }} ({{ p.pct }}%)"></span>{% endfor %}</div>
+  <ul class="compo-key">{% for p in parts %}<li><a href="{{ p.href }}"><i class="{{ p.cls }}"></i>{{ p.label }} <b>{{ p.pct }}%</b></a></li>{% endfor %}</ul></div>{% endif -%}
+{%- endmacro %}

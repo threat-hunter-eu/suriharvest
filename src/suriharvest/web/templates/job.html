@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, crumbs %}
+{% block title %}{{ job.title }}{% endblock %}
+{% block content %}
+{{ crumbs([('Jobs & health', '/jobs'), (job.title, none)]) }}
+<div class="page-head">
+  <div><h1>{{ job.title }} <span class="badge {{ {'done': 'val-valid', 'failed': 'val-invalid', 'running': 'val-warnings'}.get(job.status, '') }}" id="job-status">{{ job.status }}</span></h1>
+    <p class="lede">Started {{ job.started.strftime('%H:%M:%S') }}. This page follows the job; you can leave it, the job keeps running.</p></div>
+  <div class="actions" id="job-next"{% if job.status == 'running' %} hidden{% endif %}>{% if job.link %}<a class="btn btn-primary" href="{{ job.link }}">Continue</a>{% endif %}</div>
+</div>
+<section class="card"><pre class="code job-log" id="job-log" data-job="{{ job.id }}" data-status="{{ job.status }}">{{ job.lines|join('\n') }}</pre></section>
+{% endblock %}

@@ -1,0 +1,1041 @@
+# suriharvest bundled source catalog. Imported from the curated catalog (research run of 2026-11-14).
+# Loaded with the sources.yaml schema (see docs/sources.md). Field mapping:
+#   status stale        = still served, no upstream update for more than a year: synced like active
+#   min_suricata 7 | 8  = lowest Suricata major on which the rules load (init disables sources too new for the engine)
+#   url_versions        = Suricata major -> value of ${suricata_version} in the URL
+#   oisf_name           = the name in the OISF suricata-update index (et/open, ...) when the URL is listed there
+#   licence_source, sid_range = documentation (where the licence was read; the publisher's sidallocation.org range)
+#   rules, measured     = measurement snapshot, catalog only (not copied into sources.yaml)
+#   enabled             = the curated default; `suriharvest init --preset/--tier` decides what a workspace enables
+# The `excluded:` list at the end names sources left out on purpose; `sources check` never proposes them again.
+#
+# suriharvest source catalog (core tier = the default selection). Generated 2026-11-14 (measured with Suricata 7.0.3 RELEASE, /usr/bin/suricata).
+# Every URL was fetched on 2026-11-14 (all answered 200); rule counts = alert|drop|reject|pass lines, enabled + '#'-disabled.
+# Fields: name, type (http-tarball|http-file|git), url (${suricata_version} placeholder for ET), paths (globs of *.rules inside the
+#   archive/repo; empty for http-file), licence (SPDX expression, checked against the publisher's own LICENSE/site, see licence_source),
+#   redistribute (yes|no|unknown: may the rule text go into a published build), status (active|stale|dead; stale = no update > 1 year),
+#   tier (core|community|experimental|user-fetch: licence or terms unclear, fetch it yourself), enabled (core tier + redistributable only), priority (lower wins on sid/logic collisions),
+#   min_suricata (7|8: lowest major on which the rules load), sid_range (sidallocation.org allocation of the publisher, null = none),
+#   rules (enabled + disabled), measured (snapshot), notes.
+# Totals: core 85,566 rules, community 41,905, experimental 41,798, user-fetch 496 (ptrules-open, etnetera-aggressive).
+# Collision policy: same (gid,sid) in two sources -> lower priority loses (dropped from the build, listed in collisions.json).
+sources:
+- name: et-open
+  oisf_name: et/open
+  type: http-tarball
+  url: https://rules.emergingthreats.net/open/suricata-${suricata_version}/emerging.rules.tar.gz
+  homepage: https://rules.emergingthreats.net/open/
+  paths:
+  - '**/*.rules'
+  licence: BSD-3-Clause AND GPL-2.0-only
+  licence_source: bundled rules/LICENSE + BSD-License.txt + gpl-2.0.txt
+  copyright: "Copyright (c) 2003-2026, Emerging Threats"
+  licence_files:
+  - rules/LICENSE
+  - rules/BSD-License.txt
+  - rules/gpl-2.0.txt
+  rule_licences:  # rules/LICENSE: GPLv2 for the old Snort GPL sids (and their "GPL ..." renumbering), BSD otherwise
+  - licence: GPL-2.0-only
+    sids: 1-3464, 100000000-100000908, 2100000-2103999
+    msg_prefix: 'GPL '
+  - licence: BSD-3-Clause
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 2000000-2103999, 2400000-2609999, 2700000-2799999, 100000000-199999999 (Emerging Threats)
+  sid_namespace: et  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 72487
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-13'
+    enabled: 52975
+    disabled: 19512
+    rule_files: 54
+    sid_min: 2000005
+    sid_max: 2527021
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 52975
+      failed: 0
+      pass_rate: 1.0
+    suricata_7_0_3_all_incl_disabled:
+      tested: 72487
+      failed: 0
+      pass_rate: 1.0
+  notes: 'ET Open. Bundled LICENSE: sids 2,000,000-2,799,999 BSD (c) 2003-2026 Emerging Threats; sids 1-3464 and 100,000,000-100,000,908 GPLv2. In practice
+    the 1,690 ''GPL ...'' rules renumbered to 2,100,000-2,103,999 are the old Snort GPLv2 rules (ET community thread 2396): ship BSD notice + GPLv2 text.
+    OISF index says MIT: wrong. Per-engine URL: ${suricata_version} = 7.0.3 / 8.0 (both answered 200 on 2026-11-14). Third-party IP lists inside (ciarmy,
+    dshield, compromised, botcc) carry no own licence statement. Disabled rules validated too: 72,487/72,487 load.'
+  url_versions:
+    '7': 7.0.3
+    '8': '8.0'
+- name: abuse.ch-sslbl
+  oisf_name: abuse.ch/sslbl-blacklist
+  type: http-tarball
+  url: https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: CC0-1.0
+  licence_source: abuse.ch terms of use (Feodo, SSLBL, YARAify are CC0)
+  copyright: "abuse.ch SSL Blacklist (https://sslbl.abuse.ch/), CC0-1.0: no copyright claimed"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 902200000-906200096 (Abuse.ch SSLBL)
+  sid_namespace: abuse.ch-sslbl  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 10957
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-10-21'
+    enabled: 10957
+    disabled: 0
+    rule_files: 1
+    sid_min: 903200000
+    sid_max: 903210956
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 10957
+      failed: 0
+      pass_rate: 1.0
+  notes: TLS certificate SHA1 blacklist. File header 'Last updated 2026-10-21'.
+- name: echap-stalkerware
+  oisf_name: echap/stalkerware
+  type: http-file
+  url: https://raw.githubusercontent.com/AssoEchap/stalkerware-indicators/master/generated/suricata.rules
+  paths: []
+  licence: CC-BY-4.0
+  licence_source: README 'License' section of AssoEchap/stalkerware-indicators (no LICENSE file)
+  copyright: "Echap (https://github.com/AssoEchap/stalkerware-indicators), licensed CC BY 4.0 by its README; no copyright line upstream"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 3600000-3609999 (Echap)
+  sid_namespace: echap  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 994
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-10-20'
+    enabled: 994
+    disabled: 0
+    rule_files: 1
+    sid_min: 3600000
+    sid_max: 3600993
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 994
+      failed: 0
+      pass_rate: 1.0
+  notes: Stalkerware DNS/TLS IOCs. Index says min 8.0 but all load on 7.0.3. Last commit 2026-10-20.
+- name: stamus-lateral
+  oisf_name: stamus/lateral
+  type: http-tarball
+  url: https://ti.stamus-networks.io/open/stamus-lateral-rules.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: GPL-3.0-only
+  licence_source: bundled rules/LICENSE (GPLv3)
+  copyright:
+  - "Copyright(C) 2015-2022, Stamus Networks"
+  - "Copyright 2026 Stamus Networks"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 3100000-3199999 (Stamus Networks)
+  sid_namespace: stamus  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 560
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-04-06'
+    enabled: 546
+    disabled: 14
+    rule_files: 1
+    sid_min: 3115102
+    sid_max: 3115668
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 546
+      failed: 0
+      pass_rate: 1.0
+  notes: Lateral movement detection (SMB/DCERPC/Kerberos). Last-Modified 2026-04-06; newest rule metadata 2024-08. Index min-version 6.0.6.
+- name: ptrules-open
+  oisf_name: ptrules/open
+  type: http-tarball
+  url: https://ptrules.com/files/ptopen.rules.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: MIT
+  licence_source: https://ptrules.com/files/LICENSE.txt (MIT, (c) 2024-2026 JSC Positive Technologies)
+  copyright: "Copyright (c) 2024-2026 JSC Positive Technologies"
+  # Not republished in the public builds or on the site until the owner has legal advice on the publisher; a local
+  # workspace can still enable it (fetched by the user, listed in recipes.tar.gz).
+  redistribute: unknown
+  status: active
+  tier: user-fetch
+  enabled: false
+  priority: 10
+  min_suricata: 7
+  sid_range: 10000000-11999999 (Positive Technologies)
+  sid_namespace: ptsecurity  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 433
+  measured:
+    date: '2026-11-14'
+    last_update: null
+    enabled: 429
+    disabled: 4
+    rule_files: 5
+    sid_min: 10000035
+    sid_max: 11004724
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 429
+      failed: 0
+      pass_rate: 1.0
+  notes: Successor of the archived ptresearch/AttackDetection (custom EULA, excluded). No Last-Modified header. The host answered 403 to a plain curl request
+    later the same day (WAF); fetch with a tool User-Agent, keep last-good copy.
+- name: tgreen-hunting
+  oisf_name: tgreen/hunting
+  type: http-tarball
+  url: https://github.com/travisbgreen/hunting-rules/raw/master/hunting.rules.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: GPL-3.0-only
+  licence_source: LICENSE in github.com/travisbgreen/hunting-rules (tarball lives in that repo)
+  copyright: "The author of https://github.com/travisbgreen/hunting-rules (GPL-3.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 2610000-2619999 (Travis Green)
+  sid_namespace: tgreen  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 287
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-05-07'
+    enabled: 256
+    disabled: 31
+    rule_files: 1
+    sid_min: 2610178
+    sid_max: 2610881
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 256
+      failed: 0
+      pass_rate: 1.0
+  notes: Index tarball = hunting.rules only (tar mtime 2026-05-07). Hunting/anomaly rules, noisy by design. Enable either this or travisbgreen-hunting-repo
+    (superset, 287 identical sids). Index min-version 7.0.3.
+- name: hunters-ledger
+  oisf_name: the-hunters-ledger/open
+  type: http-file
+  url: https://the-hunters-ledger.com/feeds/suricata/hunters-ledger.rules
+  paths: []
+  licence: CC-BY-4.0
+  licence_source: 'feed header ''License: CC BY 4.0'''
+  copyright: "The Hunters Ledger (https://the-hunters-ledger.com/), feed header 'License: CC BY 4.0'; no copyright line upstream"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 3500000-3509999 (The Hunters Ledger)
+  sid_namespace: hunters-ledger  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 135
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-14'
+    enabled: 135
+    disabled: 0
+    rule_files: 1
+    sid_min: 3500000
+    sid_max: 3500224
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 135
+      failed: 0
+      pass_rate: 1.0
+  notes: Campaign-based rules, stable sids via the publisher's sid-map. Index says min 8.0 but all load on 7.0.3.
+- name: abuse.ch-sslbl-ja3
+  oisf_name: abuse.ch/sslbl-ja3
+  type: http-tarball
+  url: https://sslbl.abuse.ch/blacklist/ja3_fingerprints.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: CC0-1.0
+  licence_source: abuse.ch terms of use
+  copyright: "abuse.ch SSL Blacklist (https://sslbl.abuse.ch/), CC0-1.0: no copyright claimed"
+  redistribute: 'yes'
+  status: stale
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 902200000-906200096 (Abuse.ch SSLBL)
+  sid_namespace: abuse.ch-sslbl  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 97
+  measured:
+    date: '2026-11-14'
+    last_update: '2021-08-03'
+    enabled: 97
+    disabled: 0
+    rule_files: 1
+    sid_min: 906200000
+    sid_max: 906200096
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 97
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Frozen: file header ''Last updated 2021-08-03''. JA3 rules: Suricata 8 rejects ja3.hash with non-hex content (these are hex, load on 7.0.3); JA3
+    needs app-layer.protocols.tls.ja3-fingerprints enabled.'
+- name: etnetera-aggressive
+  oisf_name: etnetera/aggressive
+  type: http-file
+  url: https://security.etnetera.cz/feeds/etn_aggressive.rules
+  paths: []
+  licence: MIT
+  licence_source: 'OISF intel index entry etnetera/aggressive (license: MIT) at https://www.openinfosecfoundation.org/rules/index.yaml, read 2026-11-14 (copy in tests/fixtures/oisf-index.yaml; re-read by catalog_check into health.yaml); no licence text in the feed or on security.etnetera.cz'
+  copyright: "Etnetera a.s. (vendor of the OISF suricata-intel-index entry etnetera/aggressive; no copyright line upstream)"
+  # Not republished until Etnetera confirms redistribution in writing: the only licence evidence is the OISF index
+  # entry, the feed has no licence text, and an EU database right may apply to the list. Fetch it yourself.
+  redistribute: unknown
+  status: active
+  tier: user-fetch
+  enabled: false
+  priority: 10
+  min_suricata: 7
+  sid_range: 5000000-5000213 (Etnetera a.s.)
+  sid_namespace: etnetera  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 63
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-14'
+    enabled: 63
+    disabled: 0
+    rule_files: 1
+    sid_min: 5000000
+    sid_max: 5000062
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 63
+      failed: 0
+      pass_rate: 1.0
+  notes: 'IP-list rules (30 IPs each); rev is a Unix timestamp. Licence only declared by the publisher''s OISF index submission: keep the attribution, re-check
+    if the index entry changes.'
+- name: oisf-trafficid
+  oisf_name: oisf/trafficid
+  type: http-file
+  url: https://openinfosecfoundation.org/rules/trafficid/trafficid.rules
+  paths: []
+  licence: MIT
+  licence_source: file header (c) 2017 OISF
+  copyright: "Copyright (c) 2017 Open Information Security Foundation"
+  redistribute: 'yes'
+  status: stale
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: null
+  rules: 34
+  measured:
+    date: '2026-11-14'
+    last_update: '2019-04-26'
+    enabled: 34
+    disabled: 0
+    rule_files: 1
+    sid_min: 300000000
+    sid_max: 300000033
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 34
+      failed: 0
+      pass_rate: 1.0
+  notes: 'App identification rules (alert ... noalert style). sid 300,000,000+ is not in the sidallocation table. Last-Modified 2019-04-26: unchanged for
+    years but still served.'
+- name: aleksibovellan-nmap
+  oisf_name: aleksibovellan/nmap
+  type: http-file
+  url: https://raw.githubusercontent.com/aleksibovellan/opnsense-suricata-nmaps/main/local.rules
+  paths: []
+  licence: MIT
+  licence_source: LICENSE in github.com/aleksibovellan/opnsense-suricata-nmaps
+  copyright: "Copyright (c) 2023 Aleksi Bovellan"
+  redistribute: 'yes'
+  status: stale
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 3400000-3499999 (Aleksi Bovellan)
+  sid_namespace: aleksibovellan  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 10
+  measured:
+    date: '2026-11-14'
+    last_update: '2025-11-10'
+    enabled: 10
+    disabled: 0
+    rule_files: 1
+    sid_min: 3400001
+    sid_max: 3400021
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 10
+      failed: 0
+      pass_rate: 1.0
+  notes: Nmap scan detection, threshold-based; last commit 2025-11-10. Index min-version 7.0.4 (loads on 7.0.3).
+- name: abuse.ch-feodotracker
+  oisf_name: abuse.ch/feodotracker
+  type: http-tarball
+  url: https://feodotracker.abuse.ch/downloads/feodotracker.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: CC0-1.0
+  licence_source: abuse.ch terms of use
+  copyright: "abuse.ch Feodo Tracker (https://feodotracker.abuse.ch/), CC0-1.0: no copyright claimed"
+  redistribute: 'yes'
+  status: active
+  tier: core
+  enabled: true
+  priority: 10
+  min_suricata: 7
+  sid_range: 900500000-900699999 (Abuse.ch Feodo Tracker)
+  sid_namespace: abuse.ch-feodo  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 5
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-03-04'
+    enabled: 5
+    disabled: 0
+    rule_files: 1
+    sid_min: 900509159
+    sid_max: 900513704
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 5
+      failed: 0
+      pass_rate: 1.0
+  notes: Nearly empty (5 IP rules); header 'Last updated 2026-03-04'.
+- name: julioliraup-antiphishing
+  oisf_name: julioliraup/antiphishing
+  type: http-tarball
+  url: https://raw.githubusercontent.com/julioliraup/Antiphishing/refs/heads/main/antiphishing.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: GPL-3.0-only
+  licence_source: GitHub licence API + LICENSE of julioliraup/Antiphishing
+  copyright: "The author of https://github.com/julioliraup/Antiphishing (GPL-3.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: 6000000-6099999 (Julioliraup)
+  sid_namespace: julioliraup  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 38316
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-14'
+    enabled: 38316
+    disabled: 0
+    rule_files: 1
+    sid_min: 6000000
+    sid_max: 6038315
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 38316
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Hourly phishing URL/IP rules + dataset files (phishing.lst, phishing_ips.lst): install the datasets next to the rules (3 rules fail with ''datasets:
+    fopen'' otherwise). 100% loads when they are. IOC-heavy, 38k rules: community tier, not core.'
+- name: daffainfo-suricata-rules
+  type: git
+  url: https://github.com/daffainfo/suricata-rules.git
+  paths:
+  - '**/*.rules'
+  licence: Apache-2.0
+  licence_source: repo LICENSE
+  copyright: "The author of https://github.com/daffainfo/suricata-rules (Apache-2.0 LICENSE names no copyright holder)"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 1167
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-08-02'
+    enabled: 1167
+    disabled: 0
+    rule_files: 252
+    sid_min: 12017001
+    sid_max: 60000148
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 1167
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Web exploit (CVE) http rules, one file per CVE. 39 sids squat IPFire''s 12M allocation; 9 collide with opnsense-rules: needs the collision policy
+    (lower priority).'
+- name: opnsense-rules
+  type: git
+  url: https://github.com/opnsense/rules.git
+  paths:
+  - src/opnsense.adult.rules
+  - src/opnsense.file_transfer.rules
+  - src/opnsense.mail.rules
+  - src/opnsense.media_streaming.rules
+  - src/opnsense.messaging.rules
+  - src/opnsense.social_media.rules
+  licence: BSD-2-Clause
+  licence_source: repo LICENSE
+  copyright: "Copyright (c) 2017, OPNsense"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 906
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-09-05'
+    enabled: 906
+    disabled: 0
+    rule_files: 6
+    sid_min: 51000000
+    sid_max: 56000131
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 906
+      failed: 0
+      pass_rate: 1.0
+  notes: App/policy detection (adult, social media, messaging, file transfer, mail, streaming). opnsense.test.rules left out. sids 51,000,000-56,000,131
+    unallocated; 9 sids collide with daffainfo.
+- name: travisbgreen-hunting-repo
+  type: git
+  url: https://github.com/travisbgreen/hunting-rules.git
+  paths:
+  - '*.rules'
+  licence: GPL-3.0-only
+  licence_source: repo LICENSE (GPLv3)
+  copyright: "The author of https://github.com/travisbgreen/hunting-rules (GPL-3.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: 2610000-2619999 (Travis Green)
+  sid_namespace: tgreen  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 719
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-05-07'
+    enabled: 682
+    disabled: 37
+    rule_files: 4
+    sid_min: 2610006
+    sid_max: 2619930
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 682
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Repo superset of tgreen-hunting (hunting, pii, most_abused_tld, browser_extension .rules). Same publisher namespace: use one of the two.'
+- name: fcsc-shovel
+  type: git
+  url: https://github.com/FCSC-FR/shovel.git
+  paths:
+  - suricata/rules/suricata.rules
+  licence: GPL-2.0-or-later
+  licence_source: SPDX header in suricata/rules/suricata.rules + LICENSES/ (REUSE)
+  copyright: "Copyright (C) 2023-2024 ANSSI"
+  licence_files:
+  - LICENSES/GPL-2.0-or-later.txt
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 8
+  sid_range: null
+  rules: 209
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-09-26'
+    enabled: 206
+    disabled: 3
+    rule_files: 1
+    sid_min: 1
+    sid_max: 7001
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 206
+      failed: 17
+      pass_rate: 0.9175
+  notes: 'CTF (attack-defense) oriented rules by ANSSI; sids 1-7001 collide with Snort community (58). 16 fail on 7.0.3: threshold ''track by_flow'' (8.0
+    only), 1 tls.alpn (8.0). min_suricata 8.'
+- name: quadrantsec-suricata-rules
+  type: git
+  url: https://github.com/quadrantsec/suricata-rules.git
+  paths:
+  - '*.rules'
+  licence: GPL-2.0-only
+  licence_source: repo LICENSE (GPLv2)
+  copyright: "The maintainers of https://github.com/quadrantsec/suricata-rules (GPL-2.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 177
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-13'
+    enabled: 172
+    disabled: 5
+    rule_files: 1
+    sid_min: 1000379
+    sid_max: 81000130
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 172
+      failed: 31
+      pass_rate: 0.8198
+  notes: 'Uses $INTERNAL_NETWORK (27 rules fail unless defined) + 4 real errors. sids spread over others'' ranges (PT 86, abuse.ch 30, a vendor range 3) and
+    local range: 30 collide with vedas, 1 with PT Open. Lowest priority.'
+- name: connectwise-cru
+  type: git
+  url: https://github.com/ConnectWise-Software/ConnectWise-CRU.git
+  paths:
+  - suricata/*.rules
+  licence: GPL-3.0-only
+  licence_source: repo LICENSE (GPLv3)
+  copyright: "The maintainers of https://github.com/ConnectWise-Software/ConnectWise-CRU (GPL-3.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: stale
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 149
+  measured:
+    date: '2026-11-14'
+    last_update: '2024-03-11'
+    enabled: 149
+    disabled: 0
+    rule_files: 5
+    sid_min: 900074
+    sid_max: 900461
+    dup_sid_lines: 3
+    suricata_7_0_3:
+      tested: 146
+      failed: 2
+      pass_rate: 0.9863
+  notes: 'ConnectWise CRU suricata/*.rules (hunting, recon, trojan, web_server, webshells); 5 GB repo: sparse clone with blob filter only. Last push 2024-03.
+    2 fail (missing sid, bad hex).'
+- name: digitalbond-quickdraw
+  type: git
+  url: https://github.com/digitalbond/Quickdraw-Snort.git
+  paths:
+  - all-quickdraw.rules
+  licence: MIT
+  licence_source: repo LICENSE
+  copyright: "Copyright (c) 2015 Digital Bond"
+  redistribute: 'yes'
+  status: stale
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: 1000000-1999999 (local use!)
+  rules: 58
+  measured:
+    date: '2026-11-14'
+    last_update: '2020-10-02'
+    enabled: 58
+    disabled: 0
+    rule_files: 1
+    sid_min: 1111001
+    sid_max: 1111709
+    dup_sid_lines: 7
+    suricata_7_0_3:
+      tested: 51
+      failed: 10
+      pass_rate: 0.8039
+  notes: ICS (Modbus/DNP3/ENIP/BACnet/S7...) rules, last push 2020. Needs ICS app-layer protocols enabled and vars like $BACNET_CLIENT/$FINS_CLIENT (10
+    fail otherwise). Uses the local range.
+- name: ipfire-dbl
+  oisf_name: ipfire/dbl
+  type: http-tarball
+  url: https://dbl.ipfire.org/lists/suricata.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: CC-BY-SA-4.0
+  licence_source: 'rule file header ''License: CC BY-SA 4.0'''
+  copyright: "Copyright (C) 2026 - IPFire Team"
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 8
+  sid_range: 12000000-12999999 (IPFire)
+  sid_namespace: ipfire  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 56
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-14'
+    enabled: 56
+    disabled: 0
+    rule_files: 14
+    sid_min: 12000801
+    sid_max: 12002504
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 56
+      failed: 56
+      pass_rate: 0.0
+  notes: 'Domain blocklist rules + 14 dataset files; uses the 8.0-only ''domain'' transform: 56/56 fail on 7.0.3 (''unknown rule keyword domain''). Ship
+    datasets/ with the rules.'
+- name: red-team-tool-countermeasures
+  type: git
+  url: https://github.com/mandiant/red_team_tool_countermeasures.git
+  paths:
+  - all-snort.rules
+  licence: BSD-2-Clause
+  licence_source: repo LICENSE.txt
+  copyright: "The copyright line of LICENSE.txt in https://github.com/mandiant/red_team_tool_countermeasures (sync keeps the file; NOTICE.md quotes it)"
+  redistribute: 'yes'
+  status: stale
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 40
+  measured:
+    date: '2026-11-14'
+    last_update: '2024-03-05'
+    enabled: 40
+    disabled: 0
+    rule_files: 1
+    sid_min: 25848
+    sid_max: 77600828
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 40
+      failed: 0
+      pass_rate: 1.0
+  notes: Archived 2024-03 (FireEye red-team tool countermeasures). Only all-snort.rules is used (the per-tool files duplicate it). Loads 100% on 7.0.3.
+- name: 401trg-detections
+  type: git
+  url: https://github.com/401trg/detections.git
+  paths:
+  - ids/*.rules
+  licence: Apache-2.0
+  licence_source: repo LICENSE.md (Apache 2.0, (c) 2017 ProtectWise 401TRG)
+  copyright: "Copyright 2017 ProtectWise 401TRG"
+  redistribute: 'yes'
+  status: stale
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 34
+  measured:
+    date: '2026-11-14'
+    last_update: '2021-04-14'
+    enabled: 34
+    disabled: 0
+    rule_files: 6
+    sid_min: 600020
+    sid_max: 70045805
+    dup_sid_lines: 3
+    suricata_7_0_3:
+      tested: 31
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Last push 2021-04: stale but loads 100%.'
+- name: eset-malware-ioc
+  type: git
+  url: https://github.com/eset/malware-ioc.git
+  paths:
+  - '**/*.rules'
+  licence: BSD-2-Clause
+  licence_source: repo LICENSE
+  copyright: "Copyright (c) 2014-2018 ESET spol. s r.o."
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 31
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-10'
+    enabled: 31
+    disabled: 0
+    rule_files: 7
+    sid_min: 1000002
+    sid_max: 45410004
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 31
+      failed: 1
+      pass_rate: 0.9677
+  notes: 'Research IOCs (potao, windigo, ta410...). 16 sids sit in ET''s range and collide with different ET Open rules: drop or remap those on collision.
+    1 rule fails (isdataat).'
+- name: sudohyak-suricata-rules
+  type: git
+  url: https://github.com/sudohyak/suricata-rules.git
+  paths:
+  - '**/*.rules'
+  licence: GPL-3.0-only
+  licence_source: repo LICENSE
+  copyright: "The author of https://github.com/sudohyak/suricata-rules (GPL-3.0 LICENSE; no copyright line upstream)"
+  redistribute: 'yes'
+  status: stale
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 22
+  measured:
+    date: '2026-11-14'
+    last_update: '2021-01-26'
+    enabled: 22
+    disabled: 0
+    rule_files: 17
+    sid_min: 20202233
+    sid_max: 2020271313
+    dup_sid_lines: 1
+    suricata_7_0_3:
+      tested: 21
+      failed: 0
+      pass_rate: 1.0
+  notes: 2020-2021 CVE rules, stale; overlaps al0ne/suricata-rules (unlicensed, excluded).
+- name: volexity-threat-intel
+  type: git
+  url: https://github.com/volexity/threat-intel.git
+  paths:
+  - '**/*.rules'
+  licence: BSD-2-Clause
+  licence_source: repo LICENSE.txt (2-Clause BSD, (c) 2022 Volexity)
+  copyright: "Copyright 2022 by Volexity, Inc."
+  redistribute: 'yes'
+  status: active
+  tier: community
+  enabled: false
+  priority: 50
+  min_suricata: 7
+  sid_range: null
+  rules: 21
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-10-13'
+    enabled: 21
+    disabled: 0
+    rule_files: 18
+    sid_min: 201507081
+    sid_max: 2023033002
+    dup_sid_lines: 7
+    suricata_7_0_3:
+      tested: 14
+      failed: 1
+      pass_rate: 0.9286
+  notes: GitHub API says NOASSERTION; text is BSD-2. Rules split over lines/duplicated (7 dup sid lines); $HTT_PORTS typo makes 1 fail. Needs multi-line
+    repair.
+- name: pawpatrules
+  oisf_name: pawpatrules
+  type: http-tarball
+  url: https://rules.pawpatrules.fr/suricata/paw-patrules.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: CC-BY-NC-SA-4.0
+  licence_source: 'pawpatrules.fr ''License: CC BY-NC-SA 4.0'' (+ ''you may not sell the rules''); OISF index says CC-BY-SA-4.0'
+  redistribute: 'no'
+  status: active
+  tier: experimental
+  enabled: false
+  priority: 80
+  min_suricata: 7
+  sid_range: 3300000-3399999 (Pawpatrules)
+  sid_namespace: pawpatrules  # sidallocation.org owner of the range: keeps its sids in a clash
+  rules: 21477
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-14'
+    enabled: 21475
+    disabled: 2
+    rule_files: 89
+    sid_min: 3300003
+    sid_max: 3321500
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 21475
+      failed: 0
+      pass_rate: 1.0
+  notes: 'Free to fetch, hourly, 21.5k rules + .lst datasets (100% load when datasets sit next to the rules). NonCommercial: user-fetch only, never in a
+    published build, until the publisher clarifies the index/site mismatch.'
+- name: arpsyndicate-vedas
+  type: git
+  url: https://github.com/ARPSyndicate/vedas-signatures.git
+  paths:
+  - suricata/**/*.rules
+  licence: MIT
+  licence_source: repo LICENSE
+  copyright: "Copyright (c) 2026 Automated Reconnaissance & Pwning Syndicate"
+  redistribute: 'yes'
+  status: active
+  tier: experimental
+  enabled: false
+  priority: 80
+  min_suricata: 7
+  sid_range: 1000000-1999999 (local use!)
+  rules: 16005
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-05'
+    enabled: 16005
+    disabled: 0
+    rule_files: 15976
+    sid_min: 1000002
+    sid_max: 1107407
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 16005
+      failed: 0
+      pass_rate: 1.0
+  notes: ~16k machine-generated one-rule-per-CVE files (references exploit.observer); loads 100% but quality unproven and it occupies the local range (30
+    collisions with quadrantsec). Opt-in only.
+- name: snort-community
+  type: http-tarball
+  url: https://www.snort.org/downloads/community/community-rules.tar.gz
+  paths:
+  - '**/*.rules'
+  licence: GPL-2.0-only
+  licence_source: bundled community-rules/LICENSE (GPLv2)
+  copyright:
+  - "Copyright 2001-2026 Sourcefire, Inc."
+  - "GPL rules not created by Sourcefire: their owners, listed in community-rules/AUTHORS"
+  redistribute: 'yes'
+  status: active
+  tier: experimental
+  enabled: false
+  priority: 80
+  min_suricata: 7
+  sid_range: null
+  rules: 4023
+  measured:
+    date: '2026-11-14'
+    last_update: '2026-11-13'
+    enabled: 568
+    disabled: 3455
+    rule_files: 1
+    sid_min: 105
+    sid_max: 67441
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 568
+      failed: 2
+      pass_rate: 0.9965
+    suricata_7_0_3_all_incl_disabled:
+      tested: 4023
+      failed: 25
+      pass_rate: 0.9938
+  notes: Talos Snort 2.9 community rules (www.snort.org redirects to a signed S3 URL). 568 enabled + 3,455 disabled; Suricata 7.0.3 loads 3,998/4,023 when
+    all are enabled (vars like $SIP_SERVERS, Snort-only modifiers). Low sids (105-67,441) collide with shovel. Snort-compat tier.
+- name: ditekshen-detection
+  type: git
+  url: https://github.com/ditekshen/detection.git
+  paths:
+  - snort/snort2.rules
+  licence: BSD-2-Clause
+  licence_source: repo LICENSE.txt (2-Clause BSD)
+  copyright: "Copyright 2021 by ditekSHen (https://github.com/ditekshen/detection)."
+  redistribute: 'yes'
+  status: stale
+  tier: experimental
+  enabled: false
+  priority: 80
+  min_suricata: 7
+  sid_range: null
+  rules: 293
+  measured:
+    date: '2026-11-14'
+    last_update: '2024-11-01'
+    enabled: 292
+    disabled: 1
+    rule_files: 1
+    sid_min: 910000
+    sid_max: 950004
+    dup_sid_lines: 0
+    suricata_7_0_3:
+      tested: 292
+      failed: 13
+      pass_rate: 0.9555
+  notes: 'Only snort/snort2.rules (Snort 2 syntax): 279/292 load in Suricata 7.0.3; snort3.rules is Snort 3 and is not used. Last push 2024-11.'
+
+# Sources left out on purpose. `sources check` does not propose them as candidates. Commercial feeds that need a
+# subscription key are never listed in this catalog at all.
+excluded:
+- name: abuse.ch-urlhaus
+  oisf_name: abuse.ch/urlhaus
+  url: https://urlhaus.abuse.ch/downloads/urlhaus_suricata.tar.gz
+  reason: HTTP 410 on 2026-11-14; now needs a personal abuse.ch Auth-Key; fair-use terms, not CC0 (fetch it yourself)
+- name: abuse.ch-threatfox
+  url: https://threatfox.abuse.ch/downloads/threatfox_suricata.rules
+  reason: HTTP 410; Auth-Key required; fair-use terms
+- name: abuse.ch-sslbl-c2
+  oisf_name: abuse.ch/sslbl-c2
+  url: https://sslbl.abuse.ch/blacklist/sslipblacklist.tar.gz
+  reason: deprecated 2025-01-03; still served but contains 0 rules
+- name: ptresearch-attackdetection
+  oisf_name: ptresearch/attackdetection
+  url: https://github.com/ptresearch/AttackDetection
+  reason: custom end-user licence (not redistributable), archived 2022; replaced by ptrules-open
+- name: malsilo-win-malware
+  oisf_name: malsilo/win-malware
+  reason: obsolete/unmaintained (OISF index)
+- name: dcso-suricata-rules
+  url: https://github.com/DCSO/suricata-rules
+  reason: BSD-3-Clause but rules/ is empty (only .gitkeep), last push 2023-01
+- name: jpgview-doh
+  url: https://raw.githubusercontent.com/jpgpi250/piholemanual/master/DOH/DOH.rules
+  reason: no licence (DoH reject rules); fetch it yourself
+- name: cisco-talos-iocs
+  url: https://github.com/Cisco-Talos/IOCs
+  reason: CC0 but contains no .rules files
+- name: bi-zone-detection-rules
+  reason: no licence and no Suricata rules in the repository
+- name: oisf-engine-rules
+  url: https://github.com/OISF/suricata/tree/main/rules
+  reason: GPL-2.0, shipped with the engine and version-bound; suricata-update adds them itself
+- name: unlicensed-github-repositories
+  reason: no licence, so not redistributable (several small GitHub rule repositories reviewed on 2026-11-14)

@@ -1,0 +1,25 @@
+# privacy-gate allowlist for suriharvest (generic rules only).
+# Exceptions for the sensitive terms live in the external terms file, not here.
+# Format: <path-glob> <rule-id|glob|*> [re:<regex matched against the offending line>] -- <justification>
+
+# --- the gate itself ------------------------------------------------------------
+scripts/privacy_gate.py * -- the gate's own rule patterns and examples
+
+# --- public Suricata vocabulary -------------------------------------------------
+* email-real re:(?i)@(openinfosecfoundation\.org|emergingthreats\.net) -- public upstream maintainer attribution in rule metadata
+
+# --- synthetic test data ------------------------------------------------------
+tests/* secret-url-credentials re:(?i)user:[^@]*@(?:[\w-]+\.)*(example|invalid|test|host) -- redaction tests use fake credentials on reserved domains
+tests/test_privacy_gate.py internal-path-tmp-session -- synthetic session path that tests the rule (kept in history)
+tests/* internal-private-ip -- RFC1918 addresses in rule/address-group test vectors
+
+# --- legacy history -------------------------------------------------------------
+# One commit has a catalog line (rewritten later) that a rule of the external terms file flags; the tree is clean.
+# The rule id is not named here (it would show the term), so the entry is limited to that commit and file.
+commit:3f77add5bb*:src/suriharvest/catalog/sources.yaml * -- legacy history; not published
+
+# --- the organisation's own public addresses ------------------------------------
+# Only lines whose every address is on threat-hunting.eu (the project role address, security), or on threat-hunter.eu (the
+# previous address, still in older commits: history scans must keep passing); any other
+# address on the same line, a subdomain or a look-alike domain is still blocked.
+* email-real re:(?i)^(?:[^@]|@threat-hunt(?:ing|er)\.eu(?![\w-]|\.[\w-]))*$ -- the project's public role address (security, on threat-hunting.eu; threat-hunter.eu only in older commits)

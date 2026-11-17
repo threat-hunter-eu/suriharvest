@@ -1,0 +1,190 @@
+# The expensive checks ci.yml leaves out: Python 3.13, native Windows (billed at twice the Linux rate), Suricata 8,
+# the wheel install, the phone-width web UI and the offline acceptance harness. They run on pull requests to main
+# (not for docs-only changes: ci-docs.yml covers those), daily when the repository variable
+# SURIHARVEST_FULL_CI_ENABLED is `true` (off by default), and on demand. docs/automation.md#what-runs-when.
+name: CI (full)
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'NOTICE'
+  schedule:
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-py313:
+    name: pytest (py3.13)
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # uv-managed CPython (like `uv tool install` for most users): its SQLite keeps the 32,766-variable default
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.13'
+      - run: uv sync --locked --python 3.13
+      - run: uv run --no-sync pytest -q -n auto -m "not engine and not network"
+
+  # Native Windows (no Suricata there: engine tests are deselected, updates run with --no-validate). The smoke run
+  # covers the lock, paths with spaces and non-ASCII characters, CRLF input, redirected output and LF exports.
+  windows:
+    name: windows (pytest + CLI smoke)
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      # The fixtures are byte-exact: check them out as committed (the runner's Git defaults to autocrlf=true).
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked
+      - run: uv run pytest -q -m "not engine and not network"
+      - name: CLI smoke (PowerShell)
+        shell: pwsh
+        run: ./scripts/windows-smoke.ps1
+
+  # Engine tests run inside the same digest-pinned image the nightly build validates with; Suricata 7 runs on every push (ci.yml).
+  engine-8:
+    name: engine tests (Suricata 8)
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: docker.io/jasonish/suricata:8.0.8@sha256:d5a3a1785299ab40918d465e54fedf8e3afeeedba76bb64b0cc74dbc20bda2c3
+    steps:
+      # EL9-based image: add what checkout/uv need; suricata itself is already in /usr/bin.
+      - run: dnf -y -q install git-core tar gzip && suricata -V
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked
+      - name: pytest -m engine (a skipped engine test is a failure here)
+        run: |
+          set -euo pipefail
+          uv run pytest -q -rs -m engine --junitxml "$RUNNER_TEMP/engine.xml"
+          python3 - "$RUNNER_TEMP/engine.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          tests = sum(int(s.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"engine tests: {tests}, skipped: {skipped}")
+          if tests == 0 or skipped:
+              sys.exit("engine tests were skipped or none ran: suricata not found by the tests?")
+          PY
+
+  # The bundled catalog once stayed out of git (gitignore): the built wheel must carry it and `init` must work from
+  # a clean environment that knows nothing about the source tree.
+  wheel:
+    name: wheel install + init
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - name: Build, install into a clean venv, init a workspace
+        run: |
+          set -euo pipefail
+          uv build --wheel --out-dir "$RUNNER_TEMP/dist"
+          whl=$(ls "$RUNNER_TEMP"/dist/*.whl)
+          # list once into a file: `zipfile -l | grep -q` dies of SIGPIPE under pipefail once the listing is long
+          python3 -m zipfile -l "$whl" > "$RUNNER_TEMP/wheel-files.txt"
+          for f in suriharvest/catalog/sources.yaml suriharvest/catalog/sid-allocation.tsv suriharvest/web/templates/base.html \
+                   dist-info/licenses/NOTICE; do
+            grep -q " *$f" "$RUNNER_TEMP/wheel-files.txt" || { echo "::error::$f missing from the wheel"; exit 1; }
+          done
+          uv venv "$RUNNER_TEMP/venv"
+          VIRTUAL_ENV="$RUNNER_TEMP/venv" uv pip install "$whl"
+          cd "$RUNNER_TEMP"
+          env -u SURIHARVEST_HOME "$RUNNER_TEMP/venv/bin/suriharvest" --version
+          env -u SURIHARVEST_HOME "$RUNNER_TEMP/venv/bin/suriharvest" init "$RUNNER_TEMP/ws"
+          grep -q 'name: et-open' "$RUNNER_TEMP/ws/sources.yaml"
+          SURIHARVEST_HOME="$RUNNER_TEMP/ws" "$RUNNER_TEMP/venv/bin/suriharvest" sources list
+
+  web-mobile:
+    name: web UI at 390 px, light + dark (Playwright)
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      UV_PYTHON_PREFERENCE: only-managed
+      SURIHARVEST_REQUIRE_PLAYWRIGHT: '1' # fail, do not skip, when the browser is missing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked --group ui
+      - run: uv run --group ui playwright install --with-deps chromium-headless-shell
+      - run: uv run --group ui pytest -q -rs tests/test_web_layout.py
+
+  # A brand-new user's path from a clean wheel: build, install, init, update (local fixture repos), search, show,
+  # every export checked with suricata -T, release build, web UI. Also proves the wheel ships the catalog.
+  acceptance:
+    name: acceptance (offline, Suricata 7)
+    if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: docker.io/jasonish/suricata:7.0.17@sha256:6f915ca62512c9859e888648765515b73b209dfa8a03a65edf1607f17e11fa51
+    steps:
+      - run: dnf -y -q install git-core tar gzip procps-ng diffutils && suricata -V
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - name: Acceptance harness (tests/acceptance)
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ACCEPT_RUNS="$RUNNER_TEMP/acceptance" tests/acceptance/accept.sh suriharvest "$GITHUB_WORKSPACE" --offline --locked
+      - name: Acceptance report
+        if: always()
+        run: cat "$RUNNER_TEMP"/acceptance/*/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: acceptance-logs
+          path: ${{ runner.temp }}/acceptance/
+          retention-days: 7

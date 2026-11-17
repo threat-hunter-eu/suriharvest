@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, when, token, run_status %}
+{% block title %}Builds & changes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Builds &amp; changes</h1><p class="lede">What changed between two builds of a profile, the rules waiting for review, and every update run.</p></div>
+  {% if t and new %}<div class="actions"><a class="btn btn-primary" href="/profiles/{{ t.name }}/builds/{{ new.id }}/suricata.rules">{{ icon('export') }}suricata.rules of #{{ new.id }}</a></div>{% endif %}
+</div>
+
+{% if not t %}
+<div class="card"><div class="empty"><h2>No profile yet</h2><p>Builds belong to profiles (named rulesets). Create one, then build it:</p><div class="cmd"><code id="c-pc">suriharvest profile create default &amp;&amp; suriharvest profile build default</code></div></div></div>
+{% else %}
+<div class="spread mb-4">
+  {% if profiles|length > 1 %}<span class="seg" role="group" aria-label="Profile">{% for p in profiles %}<a href="/builds?profile={{ p.name }}" aria-current="{{ 'true' if p.name == t.name else 'false' }}">{{ p.name }}</a>{% endfor %}</span>{% else %}<span class="small"><b>{{ t.name }}</b></span>{% endif %}
+  {% if builds %}<form class="row" method="get" action="/builds"><input type="hidden" name="profile" value="{{ t.name }}"><input type="hidden" name="tab" value="{{ tab }}">
+    <label class="small muted" for="b-new">Build</label><select id="b-new" name="new" data-autosubmit>{% for b in builds %}<option value="{{ b.id }}"{% if new and b.id == new.id %} selected{% endif %}>#{{ b.id }}, {{ b.created_at.strftime('%d %b %H:%M') }}</option>{% endfor %}</select>
+    <label class="small muted" for="b-old">vs</label><select id="b-old" name="old" data-autosubmit><option value="previous">previous</option>{% for b in builds %}<option value="{{ b.id }}"{% if old and b.id == old.id %} selected{% endif %}>#{{ b.id }}, {{ b.created_at.strftime('%d %b %H:%M') }}</option>{% endfor %}</select>
+    <noscript><button class="btn btn-sm" type="submit">Compare</button></noscript></form>{% endif %}
+</div>
+
+{% if not new %}
+<div class="card"><div class="empty"><h2>No build of {{ t.name }} yet</h2><p>A build writes <code>suricata.rules</code> with the profile's exclusions applied and failing rules left out.</p>
+  <form action="/profiles/{{ t.name }}/build" method="post">{{ token() }}<button class="btn btn-primary" type="submit"{% if running %} disabled{% endif %}>{{ icon('builds') }}Build now</button></form></div></div>
+{% else %}
+<section class="card">
+  <div class="card-head"><h2>Build #{{ new.id }} {% if old %}vs #{{ old.id }}{% else %}<span class="sub">first build: every rule is new</span>{% endif %}</h2>
+    <span class="small">{% if d %}{% if d.added %}<b class="diff-add">+{{ d.added|length|num }} added</b>{% else %}0 added{% endif %} &middot; {% if d.removed %}<b class="diff-del">&minus;{{ d.removed|length|num }} removed</b>{% else %}0 removed{% endif %} &middot; {{ d.changed|length|num }} changed{% endif %}{% if new.summary.remapped_sids %} &middot; {{ new.summary.remapped_sids|num }} sids remapped (stable){% endif %} &middot; {{ new.rules|num }} rules, {{ when(new.created_at) }}</span></div>
+  <div class="tab-list" role="tablist">
+    {% for key, label, n in [('review', 'New to review', review_total if review_total is defined else none), ('added', 'Added', d.added|length), ('removed', 'Removed', d.removed|length), ('changed', 'Changed', d.changed|length)] %}
+    <a role="tab" href="/builds?{{ urlencode({'profile': t.name, 'tab': key, 'new': new.id, 'old': old.id if old else 'previous'}) }}" aria-selected="{{ 'true' if tab == key else 'false' }}" class="tab{% if tab == key %} is-on{% endif %}">{{ label }}{% if n is not none %} ({{ n|num }}){% endif %}</a>
+    {% endfor %}
+  </div>
+  {% if tab == 'review' %}
+    <div class="card-body"><p class="small muted mb-0">Rules {{ t.name }} would get now that are not in build #{{ new.id }}: new rules and newer revisions. Highest score first. Tick the ones that must not go to {{ t.name }}; the next build applies it.</p></div>
+    {% if review %}
+    <form method="post" action="/profiles/{{ t.name }}/exclude-selected">{{ token() }}
+    <div class="table-scroll"><table class="rows" id="results"><thead><tr><th scope="col"><input type="checkbox" class="js-only" id="check-all" aria-label="select all on this page"></th><th scope="col">sid</th><th scope="col">Rule</th><th scope="col">Source</th><th scope="col" class="num">Score</th></tr></thead><tbody>
+    {% for g in review %}<tr data-key="{{ g.logic_hash }}" tabindex="-1"><td><input type="checkbox" name="keys" value="{{ g.rule_key }}" aria-label="select {{ g.sid }}"></td><td class="mono">{{ g.sid }}</td>
+      <td><a class="open" href="/rule/{{ g.logic_hash }}">{{ g.msg }}</a>{% if not g.redistributable %} <span class="badge lic lic-restricted">own use only</span>{% endif %}</td><td class="small">{{ g.canonical_source }}</td><td class="num">{{ g.score }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="selection-bar"><strong>Exclude the ticked rules from {{ t.name }}</strong><span class="sep"></span><input name="reason" placeholder="Reason (optional)" aria-label="reason"><button class="btn btn-primary" type="submit"{% if running %} disabled{% endif %}>{{ icon('filter') }}Exclude selected</button></div>
+    </form>
+    {% if review_total > page * 200 or page > 1 %}<nav class="pager">{% if page > 1 %}<a class="btn btn-sm" href="/profiles/{{ t.name }}/new?page={{ page - 1 }}">Previous</a>{% endif %}<span>Page {{ page }}</span>{% if review_total > page * 200 %}<a class="btn btn-sm" href="/profiles/{{ t.name }}/new?page={{ page + 1 }}">Next</a>{% endif %}</nav>{% endif %}
+    {% else %}<div class="card-body"><p class="mb-0">Nothing new since build #{{ new.id }}.</p></div>{% endif %}
+  {% else %}
+    {% set rows = d[tab] %}
+    {% if rows %}
+    <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">sid</th><th scope="col">Rule</th><th scope="col">Source</th>{% if tab == 'changed' %}<th scope="col">Change</th>{% endif %}</tr></thead><tbody>
+    {% for r in rows[:500] %}<tr><td class="mono">{{ r.exported_sid or r.sid }}</td><td>{% if tab != 'removed' %}<a href="/rule/{{ r.logic_hash }}">{{ r.msg }}</a>{% else %}{{ r.msg }}{% endif %}</td><td class="small">{{ r.source or '' }}</td>{% if tab == 'changed' %}<td class="small mono">{{ r.change }}</td>{% endif %}</tr>{% endfor %}
+    </tbody></table></div>
+    {% if rows|length > 500 %}<div class="card-foot">First 500 shown. All of them: <code>suriharvest profile diff {{ t.name }}{% if old %} {{ old.id }} {{ new.id }}{% endif %} --json</code></div>{% endif %}
+    {% else %}<div class="card-body"><p class="mb-0 muted">None.</p></div>{% endif %}
+  {% endif %}
+</section>
+{% endif %}
+{% endif %}
+
+<section class="card mt-6" id="runs" aria-labelledby="h-runs">
+  <div class="card-head"><h2 id="h-runs">Update runs <span class="sub"><code>suriharvest update</code> history; a failed run becomes the baseline only when accepted (<code>suriharvest runs accept ID</code>)</span></h2></div>
+  <div class="table-scroll"><table class="rows"><thead><tr><th scope="col">#</th><th scope="col">Started</th><th scope="col">Status</th><th scope="col" class="num">Unique rules</th><th scope="col" class="num">New</th><th scope="col" class="num">Gone</th><th scope="col">Gates failed</th></tr></thead><tbody>
+  {% for r in runs %}<tr><td><a href="/runs/{{ r.id }}">#{{ r.id }}</a></td><td class="small">{{ when(r.started_at) }}</td><td>{{ run_status(r) }}</td>
+    <td class="num">{{ r.counts.get('unique_logic', '-')|num }}</td><td class="num">{{ r.changes.get('new_logic', '-')|num }}</td><td class="num">{{ r.changes.get('gone_logic', '-')|num }}</td>
+    <td class="small">{% for gt in r.gates if gt.status == 'fail' %}{{ gt.name }}{% if not loop.last %}, {% endif %}{% else %}<span class="muted">none</span>{% endfor %}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">No update yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

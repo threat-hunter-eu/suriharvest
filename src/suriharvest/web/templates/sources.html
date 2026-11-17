@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_ui.html" import icon, lic, when, token, copy_btn %}
+{% block title %}Sources{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Sources <span class="count">{{ n_all|num }}</span></h1><p class="lede">Where your rules come from. Lower priority wins when the same rule is in several sources; a skipped download keeps the rules of the last good one.</p>
+    <p class="small muted mb-0">{{ n_ok|num }} up to date{% if n_fail %} &middot; <a href="/sources?health=failing">{{ n_fail|num }} skipped in the last update</a>{% endif %}{% if pending %} &middot; {{ pending|length }} not downloaded yet{% endif %}{% if n_disabled %} &middot; {{ n_disabled|num }} disabled (turn one on in <code>sources.yaml</code>){% endif %}{% if health %} &middot; showing {{ 'skipped' if health == 'failing' else 'up to date' }} sources only, <a href="/sources">show all</a>{% endif %}</p></div>
+  <div class="actions"><form action="/jobs/update" method="post">{{ token() }}<button class="btn btn-primary" type="submit"{% if running %} disabled title="Wait for {{ running.title }} to finish"{% endif %}>{{ icon('refresh') }}Download new rules</button></form></div>
+</div>
+<p class="small muted">Add your own source: <code id="c-add">suriharvest sources add NAME URL --licence MIT --redistribute yes</code> {{ copy_btn('#c-add', 'Copy', 'btn btn-quiet btn-sm') }} &middot; or edit <code>sources.yaml</code>; the next download applies it.</p>
+
+<div class="table-scroll"><table class="rows">
+<thead><tr><th scope="col">Source</th><th scope="col" class="num">Prio</th><th scope="col">Licence</th><th scope="col">May share</th><th scope="col" class="num">Rules</th><th scope="col" class="num">Unique</th><th scope="col" title="syntax: Suricata only / both / Snort only">Suricata / both / Snort</th><th scope="col">Last download</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+<tbody>
+{% for src, n in rows %}{% set l = last.get(src.id) %}{% set c = configs.get(src.name) %}{% set d = dial.get(src.name, {}) %}{% set li = src_lic(src) %}
+<tr>
+  <td><a href="/sources/{{ src.name }}"><b>{{ src.name }}</b></a>{% if not src.enabled %} <span class="badge badge-outline">disabled</span>{% endif %}{% if not c %} <span class="badge badge-outline">removed from sources.yaml</span>{% endif %}
+    <div class="xs muted">{{ src.type }}{% if c and c.tier %} &middot; {{ c.tier }}{% endif %}{% if src.sid_namespace != src.name %} &middot; sids <span class="mono">{{ src.sid_namespace }}</span>{% endif %}</div></td>
+  <td class="num">{{ src.priority }}</td>
+  <td>{{ lic(li[0], li[1]) }}</td>
+  <td class="small">{% if src.redistribute == 'yes' %}yes{% elif src.redistribute == 'no' %}<span class="badge lic lic-restricted">own use only</span>{% else %}unknown{% endif %}</td>
+  <td class="num">{{ n|num }}</td><td class="num"><a href="/search?q=source:{{ src.name }}">{{ canon.get(src.name, 0)|num }}</a></td>
+  <td class="small"><a href="/search?q=source:{{ src.name }}%20dialect:suricata">{{ d.get('suricata', 0)|num }}</a> / <a href="/search?q=source:{{ src.name }}%20dialect:both">{{ d.get('both', 0)|num }}</a> / <a href="/search?q=source:{{ src.name }}%20dialect:snort">{{ d.get('snort', 0)|num }}</a></td>
+  <td class="small nowrap">{% if l %}{% if l[0] == 'ok' %}<span class="badge val-valid">ok</span>{% elif l[0] == 'running' %}<span class="badge val-warnings">running</span>{% else %}<span class="badge val-warnings" title="{{ friendly_error(l[1]) }}">skipped</span>{% endif %} {{ when(l[2]) }}{% if l[0] not in ('ok', 'running') and l[1] %}<div class="xs muted note">{{ friendly_error(l[1])[:120] }}</div>{% endif %}{% else %}never{% endif %}</td>
+  <td>{% if src.name in missing %}<span class="xs muted" title="set {{ missing[src.name] }} in the environment of suriharvest serve">token missing: set {{ missing[src.name] }}</span>{% elif src.enabled %}<form action="/jobs/source/{{ src.name }}" method="post">{{ token() }}<button class="btn btn-sm btn-quiet" type="submit" title="download only this source now, then check and rebuild"{% if running %} disabled{% endif %}>Download only this</button></form>{% endif %}</td>
+</tr>
+{% endfor %}
+{% for c in pending %}
+<tr><td><b>{{ c.name }}</b> <span class="badge badge-outline">not downloaded yet</span><div class="xs muted">{{ c.type }}{% if c.tier %} &middot; {{ c.tier }}{% endif %}</div></td><td class="num">{{ c.priority }}</td><td>{% set li = (c.licence|lic_short, 'none') %}{{ lic(li[0], li[1]) }}</td><td class="small">{{ c.redistribute }}</td><td class="num">-</td><td class="num">-</td><td></td><td class="small">never</td>
+  <td>{% if c.enabled %}<form action="/jobs/source/{{ c.name }}" method="post">{{ token() }}<button class="btn btn-sm btn-quiet" type="submit"{% if running or c.name in missing %} disabled{% endif %}>Download only this</button></form>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<p class="xs muted mt-4">Unique = rules counted once, under the highest-priority source that carries them. Snort-only rules never load in Suricata and are left out of exports.</p>
+{% endblock %}

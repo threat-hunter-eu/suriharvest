@@ -1,0 +1,6 @@
+{% extends "site_base.html" %}
+{% block title %}Licences & notice{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Licences &amp; notice</h1><p class="lede"><code>NOTICE.md</code> of the release. The full licence texts are in <code>LICENSES.tar.gz</code> and in every <code>suriharvest-N.tar.gz</code>.</p></div></div>
+{% if notice %}<pre class="code">{{ notice }}</pre>{% else %}<p>No NOTICE.md in the release folder.</p>{% endif %}
+{% endblock %}

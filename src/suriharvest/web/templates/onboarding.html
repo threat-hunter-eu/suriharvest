@@ -1,0 +1,15 @@
+{% from "_ui.html" import icon, token, copy_btn %}
+<div class="onboard">
+  <h1 class="hero-title">Welcome to suriharvest</h1>
+  <p class="lede">suriharvest collects free Suricata rulesets, checks each rule in a real Suricata, merges duplicates and builds one clean <code>suricata.rules</code> you can download or point <code>suricata-update</code> at. Nothing is downloaded yet.</p>
+  <ol class="steps">
+    <li class="{{ 'done' if st.engines else 'todo-warn' }}"><div><b>Install suriharvest and Suricata</b>
+      {% if st.engines %} <span class="muted small">done; rules are test-loaded with <code class="nowrap">suricata -T</code> in {% for e, short, ver, at in st.engines %}{{ e|eng_label }}{% if ver %} {{ ver }}{% endif %}{% if not loop.last %} and {% endif %}{% endfor %}</span>
+      {% else %}<p class="small mb-0">Install Suricata (<code>apt install suricata</code>) or set <code>engines:</code> in <code>suriharvest.yaml</code>; without it rules are not checked.</p>{% endif %}</div></li>
+    <li class="done"><div><b>Choose your sources</b> <span class="muted small">done by <code>suriharvest init</code>; see them on <a href="/sources">Sources</a></span></div></li>
+    <li><div><b>Download, check and build</b> <span class="muted small">a few minutes the first time, then only what changed</span>
+      <div class="cmd"><code id="c-update">suriharvest update</code>{{ copy_btn('#c-update') }}</div>
+      <form action="/jobs/update" method="post" class="mt-2">{{ token() }}<button class="btn btn-primary" type="submit"{% if running %} disabled title="Wait for {{ running.title }} to finish"{% endif %}>{{ icon('refresh') }}Or start it here</button></form></div></li>
+    <li><div><b>Download your ruleset</b><p class="small muted mb-0">This page then shows the result, and <a href="/export">Export</a> gives you <code>suricata.rules</code> or a <code>suricata-update</code> URL.</p></div></li>
+  </ol>
+</div>

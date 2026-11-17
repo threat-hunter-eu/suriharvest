@@ -1,0 +1,238 @@
+# The checks that run on every push, to any branch: kept small on purpose (each job is billed rounded up to a whole
+# minute). Python 3.13, native Windows, Suricata 8, the wheel check, the phone-width web UI, the acceptance harness and
+# the docs examples run in ci-full.yml and ci-docs.yml (pull requests to main, daily when enabled, manual).
+# docs/automation.md#what-runs-when lists both sets; tests/test_workflows.py keeps this one small.
+name: CI
+
+on:
+  push:
+    # Every branch (and no tags: a branch filter alone leaves tag pushes out). `state` and `data` only carry the
+    # nightly sid map and stats commits.
+    branches-ignore: [state, data]
+  # Pull requests to main run lint (with tests/test_workflows.py) and the privacy gate again: a PR from a fork, or
+  # one opened by Dependabot, must not reach main without them. test (and engine) run there only for a fork's PR,
+  # whose branch never got a push run here.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff, actionlint, engine pins
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      ACTIONLINT_VERSION: '1.7.11'
+      ACTIONLINT_SHA256: '900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a' # actionlint_1.7.11_linux_amd64.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync pytest -q -n0 tests/test_workflows.py # the workflow invariants, on pull requests too
+      - name: Every workflow pins the same Suricata images
+        run: |
+          set -euo pipefail
+          refs=$(grep -hoE 'jasonish/suricata:[0-9][^ "]*' .github/workflows/*.yml | sort -u)
+          echo "$refs"
+          if echo "$refs" | grep -vqE '@sha256:[0-9a-f]{64}$'; then echo "::error::unpinned image (no digest)"; exit 1; fi
+          for major in 7 8; do
+            n=$(echo "$refs" | grep -cE "suricata:${major}\." || true)
+            [ "$n" -le 1 ] || { echo "::error::Suricata $major pinned to different images across workflows"; exit 1; }
+          done
+      - name: actionlint (pinned release binary, checksum verified)
+        run: |
+          set -euo pipefail
+          tgz="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$tgz"
+          echo "$ACTIONLINT_SHA256  $tgz" | sha256sum --check
+          tar -xzf "$tgz" actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -color
+
+  test:
+    name: pytest (py3.12)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # uv-managed CPython (like `uv tool install` for most users): its SQLite keeps the 32,766-variable default
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked
+      # pyproject addopts already deselect `engine` and `network`; repeated here so the intent is visible.
+      - run: uv run --no-sync pytest -q -n auto -m "not engine and not network"
+      - name: CLI contract used by the workflows (docs/automation.md)
+        env:
+          COLUMNS: '250' # rich would truncate long option names in --help at 80 columns
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          uv run suriharvest version
+          # rich colours --help on GitHub runners even without a TTY: strip ANSI codes before grepping
+          clihelp() { uv run suriharvest "$@" --help | sed 's/\x1b\[[0-9;]*m//g'; }
+          # captured first: `... | grep -q` would close the pipe early and pipefail would report SIGPIPE
+          h_init=$(clihelp init); h_update=$(clihelp update); h_release=$(clihelp release build); h_sources=$(clihelp sources check)
+          h_site=$(clihelp site build)
+          for cmd in "init" "doctor" "update" "release build" "sources check" "site build"; do
+            # shellcheck disable=SC2086 # word splitting of the sub-command is intended
+            uv run suriharvest $cmd --help >/dev/null || { echo "::error::missing command: suriharvest $cmd"; exit 1; }
+          done
+          for flag in --refresh --catalog --tier --redistributable-only --suricata-version --engine; do
+            grep -q -- "$flag" <<<"$h_init" || { echo "::error::init lacks $flag"; exit 1; }
+          done
+          for flag in --allow-failures --max-failed-sources --report-file; do
+            grep -q -- "$flag" <<<"$h_update" || { echo "::error::update lacks $flag"; exit 1; }
+          done
+          for flag in --engine --redistributable-only --recipes-from --download-base --build-epoch --previous --no-gates --max-drop-pct --max-source-drop-pct --report-file; do
+            grep -q -- "$flag" <<<"$h_release" || { echo "::error::release build lacks $flag"; exit 1; }
+          done
+          for flag in --catalog --health --oisf-index --licences --max-http-requests --report-file; do
+            grep -q -- "$flag" <<<"$h_sources" || { echo "::error::sources check lacks $flag"; exit 1; }
+          done
+          for flag in --release --tag --download-base --base-url --site-url --build-epoch; do
+            grep -q -- "$flag" <<<"$h_site" || { echo "::error::site build lacks $flag"; exit 1; }
+          done
+
+  # Engine tests run inside the same digest-pinned image the nightly build validates with (Suricata 8: ci-full.yml).
+  engine:
+    name: engine tests (Suricata 7)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: docker.io/jasonish/suricata:7.0.17@sha256:6f915ca62512c9859e888648765515b73b209dfa8a03a65edf1607f17e11fa51
+    steps:
+      # EL9-based image: add what checkout/uv need; suricata itself is already in /usr/bin.
+      - run: dnf -y -q install git-core tar gzip && suricata -V
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.6' # uv itself; bump with the action (checksum known to it)
+          python-version: '3.12'
+      - run: uv sync --locked
+      - name: pytest -m engine (a skipped engine test is a failure here)
+        run: |
+          set -euo pipefail
+          uv run pytest -q -rs -m engine --junitxml "$RUNNER_TEMP/engine.xml"
+          python3 - "$RUNNER_TEMP/engine.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          tests = sum(int(s.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          print(f"engine tests: {tests}, skipped: {skipped}")
+          if tests == 0 or skipped:
+              sys.exit("engine tests were skipped or none ran: suricata not found by the tests?")
+          PY
+
+  privacy:
+    name: privacy gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GITLEAKS_VERSION: '8.21.2'
+      # sha256 of gitleaks_8.21.2_linux_x64.tar.gz, pinned here: a checksums file from the same release proves nothing
+      GITLEAKS_SHA256: '5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba'
+      EMAIL_RE: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+      # Emails that are fine in a public repo (regex, one alternative per entry); git@github.com is ssh syntax.
+      EMAIL_ALLOW: 'noreply|no-reply|@example\.(com|org|net|invalid)|@localhost|@users\.noreply\.github\.com|git@github\.com'
+      # Tracked files only (never commit identities): the organisation's own public role addresses (security@...).
+      ORG_EMAIL_ALLOW: '@threat-hunt(er|ing)\.eu$'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks and the privacy gate scan the whole history
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned, checksum verified)
+        run: |
+          set -euo pipefail
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tgz="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "$base/$tgz"
+          echo "$GITLEAKS_SHA256  $tgz" | sha256sum --check --strict
+          tar -xzf "$tgz" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: gitleaks (full history)
+        run: gitleaks git --redact --no-banner --exit-code 1 .
+
+      # Generic rules (secrets, e-mails, home/user paths, databases, binaries, large files): tree and full history.
+      # Allowlist: .github/privacy-allowlist.txt (path glob, rule id, optional line regex, justification).
+      # Project-specific sensitive terms are never committed: they come from the PRIVACY_TERMS repository secret.
+      - name: Privacy gate (tree + history)
+        env:
+          PRIVACY_TERMS: ${{ secrets.PRIVACY_TERMS }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PRIVACY_TERMS:-}" ]; then
+            umask 077
+            printf '%s\n' "$PRIVACY_TERMS" > "$RUNNER_TEMP/privacy-terms.txt"
+            export SURIHARVEST_PRIVACY_TERMS="$RUNNER_TEMP/privacy-terms.txt"
+          else
+            unset SURIHARVEST_PRIVACY_TERMS
+            echo "::notice title=privacy gate::PRIVACY_TERMS secret not set - sensitive-term check skipped, generic rules only"
+          fi
+          python3 -I scripts/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history \
+            --gitleaks off --md "$RUNNER_TEMP/privacy.md"
+          rm -f "$RUNNER_TEMP/privacy-terms.txt"
+      - name: Privacy gate report
+        if: always()
+        run: cat "$RUNNER_TEMP/privacy.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Licensed rule text must not be committed
+        run: |
+          set -euo pipefail
+          # The repo holds code, the catalog and state only. Real rules arrive at run time and leave as release assets.
+          # Rules in the commercial ET sid range (2,800,000-2,899,999) or a workspace/corpus folder are signs of a leak.
+          bad=$(git ls-files | grep -E '^(\.ws|workspace|corpus|data)/|\.rules(\.gz)?$' | grep -vE '^tests/(fixtures|acceptance/fixtures)/' || true)
+          if [ -n "$bad" ]; then echo "::error::rule files or workspace folders tracked:"; echo "$bad"; exit 1; fi
+          if git grep -nIE 'sid: *28[0-9]{5} *;' -- . ':!.github/workflows/ci.yml' > "$RUNNER_TEMP/range.txt"; then
+            echo "::error::rules in the commercial ET sid range (2.8M) found:"; cat "$RUNNER_TEMP/range.txt"; exit 1
+          fi
+
+      - name: Email addresses in tracked files
+        run: |
+          set -euo pipefail
+          if git grep -nIoE "$EMAIL_RE" -- . ':!.github/workflows/ci.yml' ':!scripts/privacy_gate.py' \
+               | grep -viE "$EMAIL_ALLOW" | grep -viE "$ORG_EMAIL_ALLOW" > "$RUNNER_TEMP/emails.txt"; then
+            echo "::error::email addresses found; use noreply/example.com or remove them"
+            cat "$RUNNER_TEMP/emails.txt"
+            exit 1
+          fi
+          echo "no emails"
+
+      - name: Commit author/committer emails are noreply
+        run: |
+          set -euo pipefail
+          bad=$(git log --all --format='%ae%n%ce' | sort -u | grep -viE "$EMAIL_ALLOW" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::history contains non-noreply author/committer emails:"
+            echo "$bad"
+            exit 1
+          fi
