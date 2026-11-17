@@ -23,3 +23,8 @@ commit:3f77add5bb*:src/suriharvest/catalog/sources.yaml * -- legacy history; not
 # previous address, still in older commits: history scans must keep passing); any other
 # address on the same line, a subdomain or a look-alike domain is still blocked.
 * email-real re:(?i)^(?:[^@]|@threat-hunt(?:ing|er)\.eu(?![\w-]|\.[\w-]))*$ -- the project's public role address (security, on threat-hunting.eu; threat-hunter.eu only in older commits)
+
+# --- GitHub bot identities in commit metadata ---------------------------------------
+# Dependabot commits carry a "Signed-off-by: dependabot[bot]" trailer with GitHub's support address (its author and
+# GitHub's web-flow committer use noreply addresses, already safe). Only that address, only in commit trailers.
+<trailer> email-commit-author re:^support@github\.com$ -- Dependabot's Signed-off-by trailer (dependabot[bot], GitHub support address)
