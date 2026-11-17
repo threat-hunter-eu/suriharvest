@@ -1,6 +1,6 @@
 """Compare the bundled source catalog with the OISF suricata-update index and check that every source answers.
 
-Usage: uv run python scripts/refresh_catalog.py   (same as `suriharvest sources check`)
+Usage: uv run python scripts/maintainer/refresh_catalog.py   (same as `suriharvest sources check`)
 """
 
 from __future__ import annotations

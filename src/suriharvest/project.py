@@ -46,5 +46,5 @@ def security_txt(issued: datetime, canonical: str = "") -> str:
     lines += [f"Contact: {repo_url()}/security/advisories/new", f"Expires: {expires:%Y-%m-%dT%H:%M:%SZ}", "Preferred-Languages: en"]
     if canonical:
         lines.append(f"Canonical: {canonical}")
-    lines.append(f"Policy: {repo_url()}/blob/main/SECURITY.md")
+    lines.append(f"Policy: {repo_url()}/blob/main/.github/SECURITY.md")
     return "\n".join(lines) + "\n"

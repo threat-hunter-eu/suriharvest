@@ -24,7 +24,7 @@ purpose), make that run the baseline with `suriharvest runs accept <id>`. `surih
 
 ## systemd
 
-Files in [`deploy/systemd/`](../deploy/systemd/): `suriharvest-update.service` (oneshot, waits up to 10 minutes for a busy workspace),
+Files in [`docs/deploy/systemd/`](deploy/systemd/): `suriharvest-update.service` (oneshot, waits up to 10 minutes for a busy workspace),
 `suriharvest-update.timer` (daily 05:15, `Persistent=true`), `suriharvest-update-failed@.service` (OnFailure hook:
 replace its ExecStart with your notifier). Tokens for sources that need one (`auth:`) go in `/etc/suriharvest/env`
 (`EnvironmentFile=`), never in sources.yaml.

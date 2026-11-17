@@ -198,7 +198,7 @@ jobs:
             unset SURIHARVEST_PRIVACY_TERMS
             echo "::notice title=privacy gate::PRIVACY_TERMS secret not set - sensitive-term check skipped, generic rules only"
           fi
-          python3 -I scripts/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history \
+          python3 -I scripts/maintainer/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history \
             --gitleaks off --md "$RUNNER_TEMP/privacy.md"
           rm -f "$RUNNER_TEMP/privacy-terms.txt"
       - name: Privacy gate report
@@ -219,7 +219,7 @@ jobs:
       - name: Email addresses in tracked files
         run: |
           set -euo pipefail
-          if git grep -nIoE "$EMAIL_RE" -- . ':!.github/workflows/ci.yml' ':!scripts/privacy_gate.py' \
+          if git grep -nIoE "$EMAIL_RE" -- . ':!.github/workflows/ci.yml' ':!scripts/maintainer/privacy_gate.py' \
                | grep -viE "$EMAIL_ALLOW" | grep -viE "$ORG_EMAIL_ALLOW" > "$RUNNER_TEMP/emails.txt"; then
             echo "::error::email addresses found; use noreply/example.com or remove them"
             cat "$RUNNER_TEMP/emails.txt"

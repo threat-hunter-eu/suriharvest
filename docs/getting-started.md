@@ -138,7 +138,7 @@ Downloads honour `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` and `NO_PROXY`. suri
 name itself, refuses internal addresses, and asks the proxy for the checked address (the real name stays in
 `Host`, SNI and the certificate check). If the machine has no DNS of its own and only the proxy can resolve
 names, set `SURIHARVEST_TRUST_PROXY=1`: the proxy then resolves, and it must block internal addresses itself
-(details: [SECURITY.md](../SECURITY.md)).
+(details: [SECURITY.md](../.github/SECURITY.md)).
 
 <!-- doctest: skip needs a proxy and the network -->
 ```bash
@@ -235,7 +235,7 @@ Daily with cron:
 23 5 * * *  SURIHARVEST_HOME=$HOME/suri  $HOME/.local/bin/suriharvest update >> $HOME/suri/update.log 2>&1
 ```
 
-A systemd service and timer are in `deploy/systemd/` (`suriharvest-update.service`, `.timer` and an
+A systemd service and timer are in `docs/deploy/systemd/` (`suriharvest-update.service`, `.timer` and an
 `OnFailure` hook): set `SURIHARVEST_BIN` and `SURIHARVEST_HOME` in the unit, then
 `systemctl enable --now suriharvest-update.timer`. See [scheduling.md](scheduling.md).
 

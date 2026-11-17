@@ -1,6 +1,6 @@
 """Catalog health: compare a source catalog with the OISF suricata-update index and check that sources answer.
 
-Used by `suriharvest sources check` (and scripts/refresh_catalog.py). Never edits the catalog: a human reviews
+Used by `suriharvest sources check` (and scripts/maintainer/refresh_catalog.py). Never edits the catalog: a human reviews
 licences before a source is added or its redistribute/status/tier changes. The health file it writes is
 deterministic (sorted, no timestamps), so a quiet week gives an empty diff.
 """

@@ -1,4 +1,4 @@
-"""scripts/privacy_gate.py: generic rules in the repo, sensitive terms only from an external file."""
+"""scripts/maintainer/privacy_gate.py: generic rules in the repo, sensitive terms only from an external file."""
 
 import hashlib
 import importlib.util
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-GATE = Path(__file__).resolve().parents[1] / "scripts" / "privacy_gate.py"
+GATE = Path(__file__).resolve().parents[1] / "scripts" / "maintainer" / "privacy_gate.py"
 
 
 def load_gate():
@@ -100,19 +100,19 @@ def test_bad_terms_line_names_only_the_line(repo, tmp_path, monkeypatch, capsys)
     assert "terms file:1" in err and "zorbex" not in err
 
 
-# SHA-256 of scripts/privacy_gate.py. The script is a shared file: it must stay byte-identical in sigharvest and
+# SHA-256 of scripts/maintainer/privacy_gate.py. The script is a shared file: it must stay byte-identical in sigharvest and
 # suriharvest (each repo keeps its own .github/privacy-allowlist.txt; the sensitive terms live outside both).
 GATE_SHA256 = "18a5915dc0c6318f2a1eafe515829d73e5cc94c05c52ea52e2f4b90e91438c5f"
 
 
 def test_gate_is_the_shared_copy() -> None:
-    """scripts/privacy_gate.py is byte-identical in sigharvest and suriharvest.
+    """scripts/maintainer/privacy_gate.py is byte-identical in sigharvest and suriharvest.
 
-    To change it: edit the script in one repo, copy the same bytes to scripts/privacy_gate.py of the other repo,
-    run `sha256sum scripts/privacy_gate.py` and put the new hash in GATE_SHA256 of tests/test_privacy_gate.py in
+    To change it: edit the script in one repo, copy the same bytes to scripts/maintainer/privacy_gate.py of the other repo,
+    run `sha256sum scripts/maintainer/privacy_gate.py` and put the new hash in GATE_SHA256 of tests/test_privacy_gate.py in
     BOTH repos (same commit message in each). CRLF is normalised to LF so a Windows checkout gives the same hash.
     """
-    path = Path(__file__).resolve().parents[1] / "scripts" / "privacy_gate.py"
+    path = Path(__file__).resolve().parents[1] / "scripts" / "maintainer" / "privacy_gate.py"
     data = path.read_bytes().replace(b"\r\n", b"\n")
     assert data.splitlines()[1].startswith(b"# shared file; keep identical in sigharvest and suriharvest")
     assert hashlib.sha256(data).hexdigest() == GATE_SHA256, "privacy_gate.py changed: update it in both repos (see this docstring)"

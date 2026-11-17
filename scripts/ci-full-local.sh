@@ -32,7 +32,7 @@ step "ruff format" uv run --no-sync ruff format --check .
 if command -v actionlint >/dev/null; then step "actionlint" actionlint; else echo "actionlint not installed: skipped"; fi
 step "pytest (py3.12)" on 3.12 pytest -q -n auto -m "not engine and not network"
 step "engine tests (local suricata)" uv run --no-sync pytest -q -rs -m engine
-step "privacy gate" python3 -I scripts/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history
+step "privacy gate" python3 -I scripts/maintainer/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history
 
 if [ "$QUICK" = 0 ]; then
     step "pytest (py3.13)" on 3.13 pytest -q -n auto -m "not engine and not network"

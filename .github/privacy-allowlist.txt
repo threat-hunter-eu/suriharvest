@@ -3,7 +3,7 @@
 # Format: <path-glob> <rule-id|glob|*> [re:<regex matched against the offending line>] -- <justification>
 
 # --- the gate itself ------------------------------------------------------------
-scripts/privacy_gate.py * -- the gate's own rule patterns and examples
+scripts/*privacy_gate.py * -- the gate's own rule patterns and examples
 
 # --- public Suricata vocabulary -------------------------------------------------
 * email-real re:(?i)@(openinfosecfoundation\.org|emergingthreats\.net) -- public upstream maintainer attribution in rule metadata

@@ -63,7 +63,7 @@ jobs:
       - run: uv run pytest -q -m "not engine and not network"
       # README images are relative paths on GitHub; the PyPI page needs absolute URLs (docs/conventions.md).
       - name: README with absolute URLs for PyPI
-        run: python3 scripts/pypi_readme.py
+        run: python3 scripts/maintainer/pypi_readme.py
       # --no-sources: build exactly what an index install would resolve, ignoring any [tool.uv.sources] overrides.
       - run: uv build --no-sources
       - name: Wheel carries the catalog and installs cleanly
