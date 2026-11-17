@@ -636,9 +636,11 @@ jobs:
           [[ "$GH_REPO" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::bad SURIHARVEST_RULES_REPO: $GH_REPO"; exit 1; }
           grep -q "https://github.com/$GH_REPO/releases/latest/download/" release/index.yaml \
             || { echo "::error::index.yaml does not point at $GH_REPO"; exit 1; }
-          echo "owner=${GH_REPO%%/*}" >> "$GITHUB_OUTPUT"
-          echo "name=${GH_REPO#*/}" >> "$GITHUB_OUTPUT"
-          if [ "$GH_REPO" = "$GITHUB_REPOSITORY" ]; then echo "cross=false"; else echo "cross=true"; fi >> "$GITHUB_OUTPUT"
+          {
+            echo "owner=${GH_REPO%%/*}"
+            echo "name=${GH_REPO#*/}"
+            if [ "$GH_REPO" = "$GITHUB_REPOSITORY" ]; then echo "cross=false"; else echo "cross=true"; fi
+          } >> "$GITHUB_OUTPUT"
           echo "publishing to $GH_REPO"
 
       - name: Token for the rules repository (GitHub App; contents write on that repository only)
