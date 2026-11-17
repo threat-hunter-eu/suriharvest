@@ -5,8 +5,8 @@ pypi.org has no repository to resolve them against. publish.yml runs this right 
 wheel carry absolute URLs: images to raw.githubusercontent.com, other files to github.com/.../blob/main.
 The repository URL is [project.urls].Homepage of pyproject.toml.
 
-    python3 scripts/pypi_readme.py            # rewrite README.md in place
-    python3 scripts/pypi_readme.py --check    # print the rewritten text, change nothing
+    python3 scripts/maintainer/pypi_readme.py            # rewrite README.md in place
+    python3 scripts/maintainer/pypi_readme.py --check    # print the rewritten text, change nothing
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 _SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.I)
 _IMAGE_ATTR = re.compile(r'(<(?:img|source)\b[^>]*?\b(?:src|srcset)=")([^"]+)(")', re.I)
 _HREF = re.compile(r'(<a\b[^>]*?\bhref=")([^"]+)(")', re.I)

@@ -159,7 +159,7 @@ fi
 BIN="$RUN/bin/$CLI"
 tool_version
 run_step "$CLI --help" -- "$BIN" --help
-# The marker list is not kept in this repository (scripts/privacy_gate.py scans the whole tree,
+# The marker list is not kept in this repository (scripts/maintainer/privacy_gate.py scans the whole tree,
 # --help text included, in CI). Set ACCEPT_INTERNAL_RE to a regex to run this check here too.
 INTERNAL_RE=${ACCEPT_INTERNAL_RE:-}
 if [[ -n $INTERNAL_RE ]]; then

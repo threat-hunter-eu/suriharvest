@@ -77,7 +77,7 @@ markers = [
 [tool.ruff]
 line-length = 140
 target-version = "py312"
-extend-exclude = ["src/suriharvest/migrations/versions", "scripts/privacy_gate.py", "tests/acceptance"]  # the gate is a standalone stdlib script (own style)
+extend-exclude = ["src/suriharvest/migrations/versions", "scripts/maintainer/privacy_gate.py", "tests/acceptance"]  # the gate is a standalone stdlib script (own style)
 
 [tool.ruff.lint]
 # Same rule set as sigharvest.

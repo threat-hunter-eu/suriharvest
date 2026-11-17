@@ -9,7 +9,11 @@ Nightly rulesets are versioned separately by date (`rules-YYYY-MM-DD`); their ch
 
 ## [Unreleased]
 
-Nothing yet: changes after the first public release are listed here.
+### Changed
+
+- Tidier repository root: CONTRIBUTING, SECURITY and CODE_OF_CONDUCT moved to `.github/`, the systemd units to
+  `docs/deploy/systemd/`, maintainer tooling to `scripts/maintainer/`; a shorter README, with the screenshot tour and
+  How it works in `docs/features.md`.
 
 ## [0.1.0] - 2026-11-17
 

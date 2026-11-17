@@ -1,5 +1,5 @@
 """README.md links and images (docs/conventions.md): links are absolute; the repository's own images are relative paths
-(GitHub renders them while the repository is private) and scripts/pypi_readme.py makes everything absolute for the
+(GitHub renders them while the repository is private) and scripts/maintainer/pypi_readme.py makes everything absolute for the
 PyPI long description at build time (publish.yml)."""
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def test_readme_links_are_absolute_and_images_relative():
 
 
 def test_pypi_readme_is_absolute_and_resolves():
-    spec = importlib.util.spec_from_file_location("pypi_readme", ROOT / "scripts" / "pypi_readme.py")
+    spec = importlib.util.spec_from_file_location("pypi_readme", ROOT / "scripts" / "maintainer" / "pypi_readme.py")
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -57,7 +57,9 @@ def test_pypi_readme_is_absolute_and_resolves():
             assert (ROOT / i[len(RAW) :]).is_file(), i
     assert mod.absolute(out, mod.repository(ROOT)) == out  # idempotent
     publish = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
-    assert 0 <= publish.index("scripts/pypi_readme.py") < publish.index("uv build"), "publish.yml rewrites README before building"
+    assert 0 <= publish.index("scripts/maintainer/pypi_readme.py") < publish.index("uv build"), (
+        "publish.yml rewrites README before building"
+    )
 
 
 def test_help_has_no_bool_metavar_and_names_the_web_pages():

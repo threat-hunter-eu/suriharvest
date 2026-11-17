@@ -86,7 +86,7 @@ removed.
 
 The `build` job refuses a prerelease and a tag whose commit is not on `main` (`git merge-base --is-ancestor
 "$GITHUB_SHA" origin/main`), restores no uv cache, makes the README's relative image paths absolute
-(`scripts/pypi_readme.py`, so they show on PyPI) and builds with `uv build --no-sources`; only `publish`, inside the
+(`scripts/maintainer/pypi_readme.py`, so they show on PyPI) and builds with `uv build --no-sources`; only `publish`, inside the
 protected environment, has `id-token: write`.
 
 ### Sid map state branch
@@ -129,7 +129,7 @@ runs no build. Users download from `https://github.com/threat-hunter-eu/suriharv
   private key is the secret `SURIHARVEST_RULES_APP_KEY` of the environment `rules-publish` (deployment branches: `main`
   only), so no other job, branch or pull request can read it.
 - Signing: the `sign` job signs only when **both** repositories are verified public (same fail-closed API check).
-  The Sigstore identity stays this repository's `nightly.yml` on `main` (see SECURITY.md).
+  The Sigstore identity stays this repository's `nightly.yml` on `main` (see .github/SECURITY.md).
 - `publish` adds `build-info.json` (tool repository, commit, run URL; not in `SHA256SUMS`). The data repository's
   `pages.yml` runs on `release: published` (App-token releases fire it), checks that the commit is on this
   repository's `main` and builds the site with that commit. This repository's `pages` job and `pages.yml` are skipped
@@ -158,13 +158,13 @@ points at the data repository (`--download-base`), and `publish` refuses an `ind
 - Supply chain: actions pinned by commit SHA (the comment names the exact tag); Suricata images pinned by digest (`jasonish/suricata:7.0.17@sha256:...`,
   `jasonish/suricata:8.0.8@sha256:...`) in the `ci*.yml` workflows and `nightly.yml`; the `lint` job of `ci.yml` fails if the pins differ
   or lose their digest. gitleaks and actionlint are pinned too.
-- Privacy: `scripts/privacy_gate.py` scans the tree and the whole history with generic rules (secrets, e-mail
+- Privacy: `scripts/maintainer/privacy_gate.py` scans the tree and the whole history with generic rules (secrets, e-mail
   addresses, home/user paths, databases, binaries, large files); exceptions go to `.github/privacy-allowlist.txt`
   (path glob, rule id, optional line regex, justification). Project-specific sensitive terms are not in the
   repository: the gate loads them from the file named by `SURIHARVEST_PRIVACY_TERMS` (format in `load_terms`); CI
   writes that file from the `PRIVACY_TERMS` repository secret and shows a notice (generic rules only) when the
   secret is missing. Run it locally before pushing:
-  `SURIHARVEST_PRIVACY_TERMS=/path/to/terms.txt python3 -I scripts/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history`.
+  `SURIHARVEST_PRIVACY_TERMS=/path/to/terms.txt python3 -I scripts/maintainer/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history`.
 
 ## Nightly, step by step
 

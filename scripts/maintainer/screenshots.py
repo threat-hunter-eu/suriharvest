@@ -7,8 +7,8 @@
 Point it at a demo workspace (`TOOL serve`) and run it from the repository root:
 
     uv run --with playwright playwright install chromium     # once
-    uv run scripts/screenshots.py                             # tool and port taken from the repository name
-    uv run scripts/screenshots.py --url http://127.0.0.1:8799 --only overview search
+    uv run scripts/maintainer/screenshots.py                             # tool and port taken from the repository name
+    uv run scripts/maintainer/screenshots.py --url http://127.0.0.1:8799 --only overview search
 
 Every shot is taken at 2x, light and dark (`NAME-light.png`, `NAME-dark.png`, the README picks one with <picture> and
 prefers-color-scheme), reduced to a 256-colour palette so each file stays small, plus docs/social-preview.png
@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Browser, Page
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 WIDTH, HEIGHT, SCALE = 1440, 900, 2
 # Every shot but the overview: the page content (#main) of a CROP_WIDTH window, at most CROP_HEIGHT tall (CSS px).
 CROP_WIDTH, CROP_HEIGHT = 1180, 720

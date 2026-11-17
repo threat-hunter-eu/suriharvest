@@ -75,23 +75,27 @@ the end.
 
 ## Repository
 
-- Docs: `getting-started.md`, `cli.md`, `web.md`, `export.md`, `sources.md`, `concepts.md`, `identity.md`,
+- Docs: `getting-started.md`, `features.md`, `cli.md`, `web.md`, `export.md`, `sources.md`, `concepts.md`, `identity.md`,
   `releases.md`, `site.md`, `scheduling.md`, `automation.md`, `architecture.md`, `faq.md`, `conventions.md`.
-- README sections, in order: centred hero (logo, name, pitch, three badges: CI, licence, Python), section links,
-  the overview screenshot, Quickstart (install, init + update, serve), What you get (screenshots), How it works
-  (Mermaid), Download the rules, Documentation, Licence and attribution. Comparisons with other tools live in
-  `docs/faq.md`. Links are absolute; the repository's own images (logo, screenshots) are relative paths, so GitHub
-  shows them even while the repository is private. `scripts/pypi_readme.py` (run by `publish.yml` before
+- README sections, in order (under ~120 lines, the first screen shows the Quickstart): centred hero (logo, name,
+  pitch, three badges: CI, licence, Python), section links, the overview screenshot, a short pitch, Quickstart
+  (install, init + update, serve), Highlights (bullets), Download the rules, Documentation, Contributing, Licence.
+  Screenshots of every page and the How it works diagram live in `docs/features.md`; comparisons with other tools
+  in `docs/faq.md`. Links are absolute; the repository's own images (logo, screenshots) are relative paths, so GitHub
+  shows them even while the repository is private. `scripts/maintainer/pypi_readme.py` (run by `publish.yml` before
   `uv build`) makes every relative link and image absolute for the PyPI page; `tests/` checks both forms.
-- Screenshots: `uv run scripts/screenshots.py` against a running demo workspace writes `docs/screenshots/NAME-light.png`
+- Screenshots: `uv run scripts/maintainer/screenshots.py` against a running demo workspace writes `docs/screenshots/NAME-light.png`
   and `NAME-dark.png` (1440x900 at 2x, the README shows them with `<picture>`) and `docs/social-preview.png`.
 - CHANGELOG follows Keep a Changelog with an `## [Unreleased]` section on top.
-- SECURITY.md sections: Supported versions, Reporting a vulnerability, Threat model, Verifying a release,
-  Dependency advisories. CODE_OF_CONDUCT.md is the same text in both.
+- .github/SECURITY.md sections: Supported versions, Reporting a vulnerability, Threat model, Verifying a release,
+  Dependency advisories. .github/CODE_OF_CONDUCT.md is the same text in both.
 - Issue templates: `bug.yml`, `source.yml`, `rule-feedback.yml`, `config.yml`.
+- Repository root: only what tools need there (README, LICENSE, NOTICE, CHANGELOG, pyproject.toml, uv.lock, the
+  pre-commit and Action files); community files (CONTRIBUTING, SECURITY, CODE_OF_CONDUCT) are in `.github/`, systemd
+  units in `docs/deploy/`, maintainer tooling (screenshots, PyPI README, privacy gate) in `scripts/maintainer/`.
 - Local checks: `scripts/ci-full-local.sh [--quick]`; clean-install test: `tests/acceptance/accept.sh TOOL
-  [REPO] --offline`. `tests/acceptance/`, `scripts/privacy_gate.py`, `scripts/pypi_readme.py` and
-  `scripts/screenshots.py` are shared copies: change them in both.
+  [REPO] --offline`. `tests/acceptance/`, `scripts/maintainer/privacy_gate.py`, `scripts/maintainer/pypi_readme.py` and
+  `scripts/maintainer/screenshots.py` are shared copies: change them in both.
 
 ## Intentional differences
 

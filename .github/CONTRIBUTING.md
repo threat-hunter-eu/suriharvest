@@ -31,7 +31,7 @@ uv run pytest -n auto              # unit tests: no network, no Suricata needed
 uv run pytest -m engine            # needs `suricata` on PATH
 uv run --group ui playwright install chromium-headless-shell && uv run --group ui pytest tests/test_web_layout.py  # every page at 390 px
 SURIHARVEST_TEST_PROXY=http://127.0.0.1:8899 uv run pytest -m proxy   # through a real forward proxy (network)
-python3 -I scripts/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history
+python3 -I scripts/maintainer/privacy_gate.py . --allowlist .github/privacy-allowlist.txt --history
 tests/acceptance/accept.sh suriharvest --offline   # clean-install test of this checkout (suricata optional)
 ```
 
@@ -42,7 +42,7 @@ and the second Suricata major are left to `ci-full.yml`):
 scripts/ci-full-local.sh            # --quick: only what runs on every push
 ```
 
-**What runs when** ([docs/automation.md](docs/automation.md#what-runs-when)): every push runs `ci.yml` only (ruff,
+**What runs when** ([docs/automation.md](../docs/automation.md#what-runs-when)): every push runs `ci.yml` only (ruff,
 actionlint, pytest on 3.12, engine tests on Suricata 7, privacy gate). Python 3.13, Windows, Suricata 8, the wheel,
 the web UI, the acceptance harness and the docs examples run on pull requests to main, daily when
 `SURIHARVEST_FULL_CI_ENABLED` is `true`, and from Actions -> Run workflow.
@@ -73,7 +73,7 @@ Editing `src/suriharvest/catalog/sources.yaml`:
 ## Privacy rules for this repository
 
 This is a public project. Never commit commercial or private rules, API keys, tokens, internal hostnames, internal
-paths or e-mail addresses. CI runs gitleaks and `scripts/privacy_gate.py` (tree and history) on every push and every pull request to main; a
+paths or e-mail addresses. CI runs gitleaks and `scripts/maintainer/privacy_gate.py` (tree and history) on every push and every pull request to main; a
 justified exception goes into `.github/privacy-allowlist.txt`. The gate in the repository holds generic rules only;
 maintainers keep a list of project-specific sensitive terms outside the repository and point the gate at it with
 `SURIHARVEST_PRIVACY_TERMS=/path/to/terms.txt` (CI reads it from the `PRIVACY_TERMS` secret and prints a notice
@@ -83,4 +83,4 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
-By contributing you agree that your contribution is released under the project's [MIT licence](LICENSE).
+By contributing you agree that your contribution is released under the project's [MIT licence](../LICENSE).
