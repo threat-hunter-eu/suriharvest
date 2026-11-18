@@ -167,6 +167,10 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks and the privacy gate scan the whole history
           persist-credentials: false
+          # On a pull request, scan the PR head itself, not GitHub's test merge commit (refs/pull/N/merge): that
+          # commit never reaches main and GitHub authors it with the PR opener's account email, which the gate
+          # (rightly) blocks. The squash commit that lands on main is scanned again by the push run.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install gitleaks (pinned, checksum verified)
         run: |
