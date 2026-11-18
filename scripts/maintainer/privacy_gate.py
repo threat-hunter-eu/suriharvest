@@ -481,9 +481,22 @@ def mask_line(line: str) -> str:
     return line
 
 
+def redact_email(email: str) -> str:
+    """An address as shown in reports and CI logs: 'a***@e***.com'. A public log must not repeat the address it blocks;
+    the full address stays in raw_line (allowlist matching only) and in the local git history."""
+    local, _, dom = email.rpartition("@")
+    name, dot, tld = dom.rpartition(".")
+    return f"{local[:1]}***@{name[:1]}***.{tld}" if dot else f"{local[:1]}***@***"
+
+
+def redact_emails(text: str) -> str:
+    """Every address in `text` that is not safe to publish, redacted (redact_email)."""
+    return EMAIL_RX.sub(lambda m: m.group(1) if email_is_safe(m.group(1)) else redact_email(m.group(1)), text)
+
+
 def make_snippet(line: str, rule: Rule | None, m: re.Match | None) -> str:
-    """Snippet for display. Secret values are always masked, whatever rule fired."""
-    s = mask_line(line)
+    """Snippet for display. Secret values are always masked and unsafe addresses redacted, whatever rule fired."""
+    s = redact_emails(mask_line(line))
     if len(s) > SNIPPET:
         a = max(0, (m.start() if m is not None else 0) - 60)
         a = min(a, max(0, len(s) - SNIPPET))
@@ -586,7 +599,11 @@ def scan_commit_identities(repo: Path) -> list[Finding]:
         return out
     cfg = git(repo, "config", "user.email", check=False).strip()
     if cfg and not email_is_safe(cfg):
-        out.append(Finding("email-git-config", "email", WARN, "git config user.email", 0, f"next commits will be authored as {cfg}", "commits", raw_line=cfg))
+        out.append(
+            Finding(
+                "email-git-config", "email", WARN, "git config user.email", 0, f"next commits will be authored as {redact_email(cfg)}", "commits", raw_line=cfg
+            )
+        )
     log = git(repo, "log", "--all", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B%x1e", check=False)
     seen = set()
     for rec in log.split("\x1e"):
@@ -606,7 +623,17 @@ def scan_commit_identities(repo: Path) -> list[Finding]:
                 continue
             seen.add(key)
             out.append(
-                Finding("email-commit-author", "email", BLOCK, f"commit:{sha[:10]}:<{role}>", 0, f"{role} {name} <{em}>", "commits", raw_line=em, commit=sha)
+                Finding(
+                    "email-commit-author",
+                    "email",
+                    BLOCK,
+                    f"commit:{sha[:10]}:<{role}>",
+                    0,
+                    f"{role} {name} <{redact_email(em)}>",
+                    "commits",
+                    raw_line=em,
+                    commit=sha,
+                )
             )
     return out
 

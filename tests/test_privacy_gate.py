@@ -102,7 +102,7 @@ def test_bad_terms_line_names_only_the_line(repo, tmp_path, monkeypatch, capsys)
 
 # SHA-256 of scripts/maintainer/privacy_gate.py. The script is a shared file: it must stay byte-identical in sigharvest and
 # suriharvest (each repo keeps its own .github/privacy-allowlist.txt; the sensitive terms live outside both).
-GATE_SHA256 = "18a5915dc0c6318f2a1eafe515829d73e5cc94c05c52ea52e2f4b90e91438c5f"
+GATE_SHA256 = "7971e341becfc1a4ff4acd8459b5463a6e33f20a1d0bd33b98463093e7f4de96"
 
 
 def test_gate_is_the_shared_copy() -> None:
@@ -116,3 +116,19 @@ def test_gate_is_the_shared_copy() -> None:
     data = path.read_bytes().replace(b"\r\n", b"\n")
     assert data.splitlines()[1].startswith(b"# shared file; keep identical in sigharvest and suriharvest")
     assert hashlib.sha256(data).hexdigest() == GATE_SHA256, "privacy_gate.py changed: update it in both repos (see this docstring)"
+
+
+def test_reports_redact_the_addresses_they_block(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """CI logs are public: a blocked address is shown redacted, the full one is kept only for allowlist matching."""
+    gate = load_gate()
+    address = "jane.doe" + "@" + "acme-widgets" + ".com"  # built at run time: the tree scan must not see it
+    assert gate.redact_email(address) == "j***@a***.com"
+    (finding,) = [f for f in gate.scan_text("docs/a.md", f"contact {address}", "tree") if f.rule == "email-real"]
+    assert address not in finding.snippet and "j***@a***.com" in finding.snippet and finding.raw_line.endswith(address)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    run("init", "-q")
+    run("-c", "user.name=Jane", "-c", f"user.email={address}", "commit", "-q", "--allow-empty", "-m", "x")
+    found = [f for f in gate.scan_commit_identities(repo) if f.rule == "email-commit-author"]
+    assert len(found) == 2 and all(address not in f.snippet and f.raw_line == address for f in found)  # author, committer
