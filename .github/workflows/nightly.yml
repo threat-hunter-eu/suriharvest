@@ -677,9 +677,20 @@ jobs:
           set -euo pipefail
           jq -n --arg repo "$GITHUB_REPOSITORY" --arg sha "$TARGET" --arg run "$RUN_URL" --arg tag "$TAG" \
             '{format: 1, tool_repo: $repo, tool_commit: $sha, workflow_run: $run, tag: $tag}' > build-info.json
-          # Same repository: tag the built commit. Rules repository: its default branch (the tool commit is not there).
-          target=()
-          [ "$CROSS" = "true" ] || target=(--target "$TARGET")
+          # Same repository: tag the built commit. Rules repository: a new commit made for this tag (the tool commit is
+          # not there): the tree and parent of its default branch, a message naming the tag, no branch moved. Every
+          # rules-* tag then has its own SHA. That matters for Pages: the rules repository's pages.yml runs on the tag
+          # and actions/deploy-pages sends GITHUB_SHA (the tag's commit) as the Pages build version; while every tag
+          # pointed at the same commit, each deploy was reported successful but the site kept serving the first build.
+          if [ "$CROSS" = "true" ]; then
+            head=$(gh api "repos/$GH_REPO/commits/HEAD" --jq .sha)
+            tree=$(gh api "repos/$GH_REPO/git/commits/$head" --jq .tree.sha)
+            commit=$(gh api "repos/$GH_REPO/git/commits" -f message="Release $TAG" -f tree="$tree" -f "parents[]=$head" --jq .sha)
+            [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not create the release commit"; exit 1; }
+            target=(--target "$commit")
+          else
+            target=(--target "$TARGET")
+          fi
           gh release create "$TAG" release/* build-info.json --draft "${target[@]}" \
             --title "Suricata rules $TAG" --notes-file release/RELEASE_NOTES.md
           gh release edit "$TAG" --draft=false --latest
