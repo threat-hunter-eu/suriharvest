@@ -48,7 +48,7 @@ source priority wins, then the higher score, then the logic hash, so the choice 
 Regular expressions (`msg_regex`, `rule_regex`, suricata-update `re:` lines) see the first 8 KiB of the text:
 Suricata does not load a longer rule, and Python's backtracking `re` would otherwise let one hostile 256 KiB
 rule stall every build. With [google-re2](https://pypi.org/project/google-re2/) installed next to suriharvest
-(`uv tool install git+https://github.com/threat-hunter-eu/suriharvest --with google-re2`), patterns RE2 supports run in linear time; the others
+(`uv tool install suriharvest --with google-re2`), patterns RE2 supports run in linear time; the others
 (back-references, look-arounds) keep using `re`. The selected rules are the same either way.
 
 An exclusion only changes a build when the rule is a candidate: a rule its publisher ships disabled (most

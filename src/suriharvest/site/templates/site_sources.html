@@ -2,7 +2,7 @@
 {% block title %}Sources{% endblock %}
 {% block content %}
 <div class="page-head"><div><h1>Sources</h1><p class="lede">{{ sources|length }} source{{ 's' if sources|length != 1 }} in this release. Each rule keeps its publisher's licence; see <a href="notice.html">the notice</a>.</p></div></div>
-<table class="rows">
+<div class="table-scroll" tabindex="0" role="region" aria-label="Sources"><table class="rows">
 <thead><tr><th scope="col">Source</th><th scope="col">Licence</th><th scope="col">May share</th><th scope="col">Status</th>{% for e, v in engines %}<th scope="col" class="num">{{ e|eng_label }}</th>{% endfor %}</tr></thead>
 <tbody>
 {% for src in sources %}
@@ -14,5 +14,5 @@
   {% for e, v in engines %}<td class="num">{{ (src.rules or {}).get(e, 0)|num }}</td>{% endfor %}
 </tr>
 {% endfor %}
-</tbody></table>
+</tbody></table></div>
 {% endblock %}

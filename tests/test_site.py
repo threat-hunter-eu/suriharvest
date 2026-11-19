@@ -73,6 +73,11 @@ def test_site_build_from_release_files(released: Path, tmp_path: Path):  # noqa:
         assert "Not affiliated with or endorsed by SigmaHQ, OISF, Proofpoint/Emerging Threats or MITRE." in html
         assert "trademarks of the Open Information Security Foundation" in html and "trademarks of Proofpoint, Inc." in html
         assert "/suriharvest/issues" in html
+    # phones: every table scrolls in its own keyboard-reachable box, never the page (axe scrollable-region-focusable)
+    for name in ("index.html", "search.html", "sources.html", "changes.html", "validation.html"):
+        html = (site / name).read_text()
+        assert html.count('<table class="rows"') == html.count('<div class="table-scroll" tabindex="0" role="region"'), name
+    assert '<pre class="code" tabindex="0">' in (site / "notice.html").read_text() or "No NOTICE.md" in (site / "notice.html").read_text()
     # deterministic
     run("site", "build", str(tmp_path / "s2"), *args)
     assert _tree(site) == _tree(tmp_path / "s2")

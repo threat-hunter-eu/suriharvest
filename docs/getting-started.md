@@ -21,12 +21,14 @@ Windows run without an engine can still collect, search and build with `--no-val
 
 <!-- doctest -->
 ```bash
-uv tool install git+https://github.com/threat-hunter-eu/suriharvest
+uv tool install suriharvest
 # or
-pipx install git+https://github.com/threat-hunter-eu/suriharvest
+pipx install suriharvest
 
 suriharvest version
 ```
+
+The development version (the `main` branch) installs from Git: `uv tool install git+https://github.com/threat-hunter-eu/suriharvest`.
 
 Upgrade with `uv tool upgrade suriharvest` or `pipx upgrade suriharvest`.
 
