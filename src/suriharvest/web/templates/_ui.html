@@ -25,7 +25,7 @@
 {%- elif e in (fails_in or []) -%}
 <span class="badge eng eng-fail" title="{{ e|eng_label }}: does not load" aria-label="{{ e|eng_label }}: does not load"><b>{{ n }}</b>&#10007;</span>
 {%- else -%}
-<span class="badge eng eng-na" title="{{ e|eng_label }}: not checked" aria-label="{{ e|eng_label }}: not checked"><b>{{ n }}</b>&ndash;</span>
+<span class="badge eng eng-na" title="{{ e|eng_label }}: not checked" aria-label="{{ e|eng_label }}: not checked"><b>{{ n }}</b>-</span>
 {%- endif -%}
 {%- endmacro %}
 
