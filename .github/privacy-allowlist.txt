@@ -28,3 +28,10 @@ commit:3f77add5bb*:src/suriharvest/catalog/sources.yaml * -- legacy history; not
 # Dependabot commits carry a "Signed-off-by: dependabot[bot]" trailer with GitHub's support address (its author and
 # GitHub's web-flow committer use noreply addresses, already safe). Only that address, only in commit trailers.
 <trailer> email-commit-author re:^support@github\.com$ -- Dependabot's Signed-off-by trailer (dependabot[bot], GitHub support address)
+
+# --- co-maintainer commit identity --------------------------------------------------
+# The co-maintainer (elhoim) publishes his commits under this address by choice; squash merges of his pull requests
+# carry it as author. Only this exact address, only in commit author/committer/Co-authored-by metadata.
+<author> email-commit-author re:^elhoim@gmail\.com$ -- co-maintainer's public commit address (his choice, accepted by the maintainers)
+<committer> email-commit-author re:^elhoim@gmail\.com$ -- co-maintainer's public commit address (his choice, accepted by the maintainers)
+<trailer> email-commit-author re:^elhoim@gmail\.com$ -- co-maintainer's public commit address (his choice, accepted by the maintainers)
