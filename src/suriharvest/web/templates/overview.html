@@ -17,7 +17,7 @@
 {% if run.status == 'failed' and not run.accepted %}
 <div class="notice notice-warn" role="alert">{{ icon('alert') }}<p><strong>The last update did not pass its checks</strong>{% if run.gates %} ({% for gt in run.gates if gt.status == 'fail' %}{{ gt.name }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}, so your rulesets were not rebuilt. <a href="/runs/{{ run.id }}">Review the update</a>; if the change was intended, accept it with <code>suriharvest runs accept latest</code>.</p></div>
 {% else %}
-<div class="status-line" role="status">{{ icon('changes') }}<p>{% if run.status == 'running' %}Update running{% else %}Updated {{ when(run.started_at) }}{% endif %}<span class="sep">&middot;</span>{% if n_fail %}{{ n_ok|num }} of {{ st.n_sources|num }} sources up to date<span class="sep">&middot;</span><a href="/sources?health=failing">{{ n_fail|num }} skipped &mdash; details</a>{% else %}{{ st.n_sources|num }} source{{ 's' if st.n_sources != 1 }} up to date{% endif %}
+<div class="status-line" role="status">{{ icon('changes') }}<p>{% if run.status == 'running' %}Update running{% else %}Updated {{ when(run.started_at) }}{% endif %}<span class="sep">&middot;</span>{% if n_fail %}{{ n_ok|num }} of {{ st.n_sources|num }} sources up to date<span class="sep">&middot;</span><a href="/sources?health=failing">{{ n_fail|num }} skipped - details</a>{% else %}{{ st.n_sources|num }} source{{ 's' if st.n_sources != 1 }} up to date{% endif %}
   {%- if ch %}<span class="sep">&middot;</span><a href="/builds">{{ ch.get('new_logic', 0)|num }} new, {{ ch.get('gone_logic', 0)|num }} removed</a>{% endif %}
   {%- if top and top.b %}<span class="sep">&middot;</span><a href="/builds?profile={{ top.t.name }}">{{ top.t.name }}: {{ top.b.rules|num }} rules ready</a>{% endif %}</p></div>
 {% endif %}
@@ -34,9 +34,9 @@
   {{ age_chart(ages) }}
   <dl class="yield-facts">
     {% if e0 %}{% set checked = e0.loads + e0.fails %}
-    <div><dt>Load in {{ e0.name|eng_label }}</dt><dd><a href="/search?q=loads:{{ e0.short }}">{% if checked %}{{ '%.1f'|format(100 * e0.loads / checked) }}%{% else %}&ndash;{% endif %}</a></dd><dd class="note">{{ e0.loads|num }} rules{% for e in engines[1:] %}{% set c = e.loads + e.fails %}; {% if c %}{{ '%.1f'|format(100 * e.loads / c) }}%{% else %}not checked{% endif %} in {{ e.name|eng_label }}{% endfor %}{% if e0.unchecked %}; {{ e0.unchecked|num }} not checked{% endif %}</dd></div>
+    <div><dt>Load in {{ e0.name|eng_label }}</dt><dd><a href="/search?q=loads:{{ e0.short }}">{% if checked %}{{ '%.1f'|format(100 * e0.loads / checked) }}%{% else %}-{% endif %}</a></dd><dd class="note">{{ e0.loads|num }} rules{% for e in engines[1:] %}{% set c = e.loads + e.fails %}; {% if c %}{{ '%.1f'|format(100 * e.loads / c) }}%{% else %}not checked{% endif %} in {{ e.name|eng_label }}{% endfor %}{% if e0.unchecked %}; {{ e0.unchecked|num }} not checked{% endif %}</dd></div>
     {% else %}
-    <div><dt>Suricata check</dt><dd><a href="/jobs">&ndash;</a></dd><dd class="note">no engine in suriharvest.yaml</dd></div>
+    <div><dt>Suricata check</dt><dd><a href="/jobs">-</a></dd><dd class="note">no engine in suriharvest.yaml</dd></div>
     {% endif %}
     <div><dt>Duplicates merged</dt><dd><a href="/builds">{{ (occ - total if occ > total else 0)|num }}</a></dd><dd class="note">rule lines whose logic another rule already has</dd></div>
     <div><dt>Sid clashes fixed</dt><dd><a href="/search?q=remapped:yes">{{ remapped|num }}</a></dd><dd class="note">remapped once, stable in every build</dd></div>

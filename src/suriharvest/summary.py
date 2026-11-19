@@ -465,13 +465,11 @@ def summarize(
                             Markup("<b>sid {} enabled in the same ruleset</b>, because it sets the {} {}").format(by, label, _c(nm))
                         )
                         if not dep_clause:
-                            dep_clause = Markup(" &mdash; <b>but only on connections where rule {} already set {} {}</b>").format(
+                            dep_clause = Markup(" - <b>but only on connections where rule {} already set {} {}</b>").format(
                                 by, label, _c(nm)
                             )
                     elif not dep_clause:
-                        dep_clause = Markup(" &mdash; <b>but only when {} {} is set, and no rule in the index sets it</b>").format(
-                            label, _c(nm)
-                        )
+                        dep_clause = Markup(" - <b>but only when {} {} is set, and no rule in the index sets it</b>").format(label, _c(nm))
                 elif op == "isnotset":
                     steps.append(Step(Markup("Only if {} {} is <b>not</b> set on this connection").format(label, _c(nm)), gate=True))
         elif kind.startswith(("dataset", "datarep")):
