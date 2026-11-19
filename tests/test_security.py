@@ -84,6 +84,40 @@ def test_guarded_backend_pins_checked_addresses(monkeypatch):
     assert inner.connected[-1] == "10.1.2.3"
 
 
+def test_guarded_backend_falls_back_to_the_next_checked_address(monkeypatch):
+    import httpcore
+    import pytest
+
+    from suriharvest import sync
+
+    class NoIPv6(_FakeInner):
+        def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):  # type: ignore[no-untyped-def]
+            self.connected.append(host)
+            if ":" in host:
+                raise httpcore.ConnectError("[Errno 101] Network is unreachable")
+            return object()
+
+    # A dual-stack name on a host without an IPv6 route: the IPv4 address still works.
+    monkeypatch.setattr(sync, "_resolve", lambda host, port: ["2600:9000::1", "93.184.216.34"])
+    inner = NoIPv6()
+    sync._GuardedBackend(allow_private=False, inner=inner).connect_tcp("feeds.example.org", 443)
+    assert inner.connected == ["2600:9000::1", "93.184.216.34"]
+    # Every address fails: the last connection error is raised (the download reports it as failed).
+    monkeypatch.setattr(sync, "_resolve", lambda host, port: ["2600:9000::1", "2600:9000::2"])
+    with pytest.raises(httpcore.ConnectError):
+        sync._GuardedBackend(allow_private=False, inner=NoIPv6()).connect_tcp("feeds.example.org", 443)
+
+
+def test_resolve_keeps_the_resolver_order(monkeypatch):
+    import socket
+
+    from suriharvest import sync
+
+    answer = [(socket.AF_INET, 1, 6, "", ("3.0.0.1", 443)), (socket.AF_INET6, 1, 6, "", ("2600::1%eth0", 443, 0, 0))]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: answer + answer)
+    assert sync._resolve("feeds.example.org", 443) == ["3.0.0.1", "2600::1"]
+
+
 def test_download_redirects_deadline_and_token(monkeypatch):
     import httpx
     import pytest
