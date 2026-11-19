@@ -155,6 +155,10 @@ points at the data repository (`--download-base`), and `publish` refuses an `ind
   itself is pinned (`version:`), and no `run:` script contains a `${{ }}` expression. `tests/test_workflows.py`
   enforces all three plus the SHA pins. Dependabot (`.github/dependabot.yml`) proposes weekly grouped updates for
   actions and `uv.lock`; bump the uv pin by hand with setup-uv.
+- Third-party actions (anything outside `actions/*` and `github/*`) must also be listed, with the exact SHA, in
+  `.github/allowed-actions.txt`, a copy of the organisation's Actions allow-list. The `privacy` job of `ci.yml`
+  (`scripts/maintainer/allowed_actions.py`) fails otherwise, so a Dependabot bump of one of them stays red until a
+  maintainer has allowed the new SHA there and in the organisation settings.
 - Supply chain: actions pinned by commit SHA (the comment names the exact tag); Suricata images pinned by digest (`jasonish/suricata:7.0.17@sha256:...`,
   `jasonish/suricata:8.0.8@sha256:...`) in the `ci*.yml` workflows and `nightly.yml`; the `lint` job of `ci.yml` fails if the pins differ
   or lose their digest. gitleaks and actionlint are pinned too.

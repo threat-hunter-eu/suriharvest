@@ -1,0 +1,7 @@
+# Third-party actions this repository may use: exact SHA pins, one per line (GitHub-owned actions/* and github/*
+# are always allowed). It mirrors the organisation and repository Actions allow-lists, which only maintainers can
+# change. CI (privacy job, scripts/maintainer/allowed_actions.py) fails when a workflow pins anything not listed here,
+# so a Dependabot bump of one of these actions stays red until a maintainer has allowed the new SHA.
+astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
