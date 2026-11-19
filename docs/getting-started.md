@@ -250,8 +250,7 @@ sudo suricata-update
 ```
 
 Use `suriharvest-7` on Suricata 7. Or download `suricata-8.rules` from the
-[latest release](https://github.com/threat-hunter-eu/suriharvest-rules/releases/latest) (the first release is published
-at launch; until then the links answer 404). Step by step: [suricata-update.md](suricata-update.md).
+[latest release](https://github.com/threat-hunter-eu/suriharvest-rules/releases/latest). Step by step: [suricata-update.md](suricata-update.md).
 
 ## Uninstall
 

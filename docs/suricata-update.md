@@ -4,9 +4,8 @@ The nightly release is a ready-made suricata-update source: no suriharvest on th
 workspace. suricata-update downloads one tarball, and its own `enable.conf` / `disable.conf` / `drop.conf` /
 `modify.conf` keep working on top of it.
 
-> **Availability.** The URLs below work once the maintainers have switched the nightly automation on
-> (`SURIHARVEST_AUTOMATION_ENABLED`, see [automation.md](automation.md)) and the first `rules-YYYY-MM-DD` release
-> exists. Until then they answer 404.
+> **Availability.** A new `rules-YYYY-MM-DD` release is published on the nights a source changed (the first one
+> on 2026-11-17); the `latest` URLs below always point at the newest one.
 
 ## Set it up
 

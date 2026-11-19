@@ -339,10 +339,12 @@ MAX_REDIRECTS = 10
 
 
 def _resolve(host: str, port: int) -> list[str]:
-    """Addresses of `host` (IP strings, scope ids stripped). Raises OSError when the lookup fails."""
+    """Addresses of `host` (IP strings, scope ids stripped), without duplicates, in the resolver's order (which
+    follows the system's address preference, e.g. IPv4 first on a host without IPv6). Raises OSError when the lookup
+    fails."""
     import socket
 
-    return sorted({i[4][0].split("%")[0] for i in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)})
+    return list(dict.fromkeys(i[4][0].split("%")[0] for i in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)))
 
 
 _NUMERIC_HOST = re.compile(r"(?:0x[0-9a-f]*|\d+)(?:\.(?:0x[0-9a-f]*|\d+))*", re.IGNORECASE)
@@ -458,8 +460,18 @@ class _GuardedBackend(httpcore.NetworkBackend):
             bad = [a for a in addrs if not _is_global(a)]
             if bad:
                 raise SyncError(f"refusing to connect to {host}: private or internal address {bad[0]} (allow_private)")
-        stream = self.inner.connect_tcp(addrs[0], port, timeout=timeout, local_address=local_address, socket_options=socket_options)
-        return _DeadlineStream(stream, self.deadline)
+        # Every address is checked above; try them in order, so a dual-stack name still downloads on a host whose
+        # IPv6 (or IPv4) route is missing, as browsers and curl do.
+        for i, addr in enumerate(addrs):
+            try:
+                stream = self.inner.connect_tcp(addr, port, timeout=timeout, local_address=local_address, socket_options=socket_options)
+            except (httpcore.ConnectError, httpcore.ConnectTimeout):
+                timeout = min(timeout, self.deadline - time.monotonic())
+                if i == len(addrs) - 1 or timeout <= 0:
+                    raise
+                continue
+            return _DeadlineStream(stream, self.deadline)
+        raise SyncError(f"cannot resolve {host}")  # not reached: addrs is not empty
 
     def sleep(self, seconds: float) -> None:
         self.inner.sleep(seconds)

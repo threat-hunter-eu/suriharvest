@@ -79,7 +79,7 @@ cosign verify-blob SHA256SUMS \
 
 The signature is made by the `sign` job of `.github/workflows/nightly.yml` running on the default branch, so
 the identity is `https://github.com/threat-hunter-eu/suriharvest/.github/workflows/nightly.yml@refs/heads/main`
-(the nightly workflow is opt-in: there is no signed release until it has been switched on).
+(releases are signed since `rules-2026-11-19.2`; older ones have only `SHA256SUMS`).
 
 Every release is also re-validated in clean Suricata 7 and 8 containers before it is published.
 

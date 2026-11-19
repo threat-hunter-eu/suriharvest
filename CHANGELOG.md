@@ -15,6 +15,14 @@ Nightly rulesets are versioned separately by date (`rules-YYYY-MM-DD`); their ch
   `docs/deploy/systemd/`, maintainer tooling to `scripts/maintainer/`; a shorter README, with the screenshot tour and
   How it works in `docs/features.md`.
 
+### Fixed
+
+- Downloads connected only to the first address of a source's name, and that was an IPv6 address whenever the name
+  had one (the list was sorted as text): on a host without an IPv6 route a dual-stack source such as
+  `oisf-trafficid` failed with `ConnectError` on every run. The checked addresses are now tried in the resolver's
+  order until one connects.
+- Docs: the suricata-update page and getting started still said the release URLs answer 404 until the first release.
+
 ## [0.1.0] - 2026-11-17
 
 First public release.
