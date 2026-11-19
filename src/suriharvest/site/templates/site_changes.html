@@ -1,8 +1,8 @@
 {% extends "site_base.html" %}
 {% block title %}Changes{% endblock %}
 {% macro rows(items) %}
-<table class="rows"><thead><tr><th scope="col">Engine</th><th scope="col" class="num">Sid</th><th scope="col">Message</th><th scope="col">Source</th><th scope="col" class="num">Rev</th></tr></thead>
-<tbody>{% for r in items[:limit] %}<tr><td>{{ r.engine|eng_label }}</td><td class="num mono">{{ r.exported_sid }}</td><td>{{ msg_of.get((r.engine, r.logic_hash), '') }}{% if r.change is defined %}<div class="xs muted">{{ r.change }}</div>{% endif %}</td><td>{{ r.source }}</td><td class="num">{{ r.rev if r.rev is not none else '' }}</td></tr>{% endfor %}</tbody></table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Changed rules"><table class="rows"><thead><tr><th scope="col">Engine</th><th scope="col" class="num">Sid</th><th scope="col">Message</th><th scope="col">Source</th><th scope="col" class="num">Rev</th></tr></thead>
+<tbody>{% for r in items[:limit] %}<tr><td>{{ r.engine|eng_label }}</td><td class="num mono">{{ r.exported_sid }}</td><td>{{ msg_of.get((r.engine, r.logic_hash), '') }}{% if r.change is defined %}<div class="xs muted">{{ r.change }}</div>{% endif %}</td><td>{{ r.source }}</td><td class="num">{{ r.rev if r.rev is not none else '' }}</td></tr>{% endfor %}</tbody></table></div>
 {% if items|length > limit %}<p class="xs muted">{{ (items|length - limit)|num }} more in <code>changes.json</code>.</p>{% endif %}
 {% endmacro %}
 {% block content %}
@@ -14,8 +14,8 @@
 {% endif %}
 {% if collisions %}
 <section class="card"><div class="card-head"><h2>Sid clashes remapped</h2></div><div class="card-body">
-<table class="rows"><thead><tr><th scope="col">Engine</th><th scope="col" class="num">gid:sid</th><th scope="col" class="num">Published as</th><th scope="col">Source</th></tr></thead>
-<tbody>{% for c in collisions %}<tr><td>{{ c.engine|eng_label }}</td><td class="num mono">{{ c.gid }}:{{ c.sid }}</td><td class="num mono">{{ c.gid }}:{{ c.exported_sid }}</td><td>{{ c.source }}</td></tr>{% endfor %}</tbody></table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Remapped sids"><table class="rows"><thead><tr><th scope="col">Engine</th><th scope="col" class="num">gid:sid</th><th scope="col" class="num">Published as</th><th scope="col">Source</th></tr></thead>
+<tbody>{% for c in collisions %}<tr><td>{{ c.engine|eng_label }}</td><td class="num mono">{{ c.gid }}:{{ c.sid }}</td><td class="num mono">{{ c.gid }}:{{ c.exported_sid }}</td><td>{{ c.source }}</td></tr>{% endfor %}</tbody></table></div>
 </div></section>
 {% endif %}
 {% endblock %}

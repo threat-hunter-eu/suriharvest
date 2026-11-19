@@ -11,12 +11,14 @@ Nightly rulesets are versioned separately by date (`rules-YYYY-MM-DD`); their ch
 
 ### Changed
 
+- README and getting started install the PyPI package (`uv tool install suriharvest` / `pipx install suriharvest`); installing from Git stays as the development option.
 - Tidier repository root: CONTRIBUTING, SECURITY and CODE_OF_CONDUCT moved to `.github/`, the systemd units to
   `docs/deploy/systemd/`, maintainer tooling to `scripts/maintainer/`; a shorter README, with the screenshot tour and
   How it works in `docs/features.md`.
 
 ### Fixed
 
+- Static site on phones: wide tables scroll inside their own keyboard-reachable box instead of widening the page; the search help text wraps; the NOTICE text is keyboard-scrollable (axe: 0 serious/critical).
 - Downloads connected only to the first address of a source's name, and that was an IPv6 address whenever the name
   had one (the list was sorted as text): on a host without an IPv6 route a dual-stack source such as
   `oisf-trafficid` failed with `ConnectError` on every run. The checked addresses are now tried in the resolver's

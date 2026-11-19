@@ -34,15 +34,17 @@ load, directly or through suricata-update. Every rule keeps its source and licen
 
 ## Quickstart
 
-You need Python 3.12+, [uv](https://docs.astral.sh/uv/) and Suricata (or Docker) to test the rules.
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/) (or [pipx](https://pipx.pypa.io/): `pipx install suriharvest`)
+and Suricata (or Docker) to test the rules.
 
 <!-- doctest -->
 ```bash
-uv tool install git+https://github.com/threat-hunter-eu/suriharvest
+uv tool install suriharvest
 suriharvest init ~/suri && cd ~/suri && suriharvest update   # first run: a few minutes
 suriharvest serve                                            # http://127.0.0.1:8077
 ```
 
+Development version from Git: `uv tool install git+https://github.com/threat-hunter-eu/suriharvest`.
 Prefer the terminal: `suriharvest search 'cobalt strike'`, `suriharvest profile build default`.
 Suricata 8, Docker engines and no local Suricata: [Getting started](https://github.com/threat-hunter-eu/suriharvest/blob/main/docs/getting-started.md).
 

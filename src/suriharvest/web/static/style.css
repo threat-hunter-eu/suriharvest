@@ -385,6 +385,7 @@ table.rows thead th:last-child { border-top-right-radius: var(--r-lg); }
 @media (max-width: 900px) {
   .lede, .lede .mono { overflow-wrap: anywhere; }
 }
+.content-id { overflow-wrap: anywhere; } /* a 64-hex id must not widen the page on phones */
 
 /* ------------------------------------------------------------------ polish pass 2 */
 .side-status { text-wrap: pretty; }

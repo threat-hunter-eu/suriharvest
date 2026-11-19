@@ -21,10 +21,10 @@
     <p><b>{{ e|eng_label }}</b>: with suricata-update, <code>suricata-update add-source suriharvest-{{ n }} &lt;url of suriharvest-{{ n }}.tar.gz&gt;</code>, or the flat file <code>suricata-{{ n }}.rules</code>.</p>
     {% endfor %}
     {% if downloads %}
-    <table class="rows">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Release files"><table class="rows">
       <thead><tr><th scope="col">File</th><th scope="col">SHA-256</th></tr></thead>
       <tbody>{% for d in downloads %}<tr><td>{% if d.url %}<a href="{{ d.url }}">{{ d.name }}</a>{% else %}{{ d.name }}{% endif %}</td><td class="mono xs">{{ d.sha256 }}</td></tr>{% endfor %}</tbody>
-    </table>
+    </table></div>
     {% else %}<p class="small muted">No SHA256SUMS in the release folder.</p>{% endif %}
   </div>
 </section>
@@ -32,8 +32,8 @@
 {% if gates %}
 <section class="card" aria-labelledby="h-gates">
   <div class="card-head"><h2 id="h-gates">Release gates</h2></div>
-  <div class="card-body"><table class="rows"><thead><tr><th scope="col">Gate</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead>
-  <tbody>{% for g in gates %}<tr><td>{{ g.name }}</td><td><span class="badge {{ 'val-valid' if g.status == 'pass' else ('val-invalid' if g.status == 'fail' else 'badge-outline') }}">{{ g.status }}</span></td><td class="small">{{ g.detail }}</td></tr>{% endfor %}</tbody></table></div>
+  <div class="card-body"><div class="table-scroll" tabindex="0" role="region" aria-label="Release gates"><table class="rows"><thead><tr><th scope="col">Gate</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead>
+  <tbody>{% for g in gates %}<tr><td>{{ g.name }}</td><td><span class="badge {{ 'val-valid' if g.status == 'pass' else ('val-invalid' if g.status == 'fail' else 'badge-outline') }}">{{ g.status }}</span></td><td class="small">{{ g.detail }}</td></tr>{% endfor %}</tbody></table></div></div>
 </section>
 {% endif %}
 
@@ -44,5 +44,5 @@
 </section>
 {% endif %}
 </div>
-<p class="xs muted mt-4">Content id <span class="mono">{{ summary.content_id or '' }}</span></p>
+<p class="xs muted mt-4">Content id <span class="mono content-id">{{ summary.content_id or '' }}</span></p>
 {% endblock %}
