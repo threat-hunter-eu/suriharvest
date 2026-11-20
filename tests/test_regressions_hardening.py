@@ -80,7 +80,10 @@ def test_decoy_rule_cannot_knock_out_the_legit_rule(tmp_path: Path, monkeypatch:
         from suriharvest.config import EngineConfig
         from suriharvest.validate import probe
 
-        engine = probe(EngineConfig("suricata-7"))
+        # The Suricata on PATH, whatever its major (7 or 8): a name such as "suricata-7" pins a major, and probe()
+        # refuses any other one before a rule is loaded. What follows holds for every supported major.
+        engine = probe(EngineConfig("local"))
+        assert engine.version.split(".")[0] in {"7", "8"}, f"unexpected Suricata {engine.version}"
         work = tmp_path / "suri"
         work.mkdir()
         rc, output = engine.run(rules_file, work)
