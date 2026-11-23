@@ -9,21 +9,25 @@ Nightly rulesets are versioned separately by date (`rules-YYYY-MM-DD`); their ch
 
 ## [Unreleased]
 
-### Changed
-
-- README and getting started install the PyPI package (`uv tool install suriharvest` / `pipx install suriharvest`); installing from Git stays as the development option.
-- Tidier repository root: CONTRIBUTING, SECURITY and CODE_OF_CONDUCT moved to `.github/`, the systemd units to
-  `docs/deploy/systemd/`, maintainer tooling to `scripts/maintainer/`; a shorter README, with the screenshot tour and
-  How it works in `docs/features.md`.
+## [0.1.1] - 2026-11-23
 
 ### Fixed
 
-- Static site on phones: wide tables scroll inside their own keyboard-reachable box instead of widening the page; the search help text wraps; the NOTICE text is keyboard-scrollable (axe: 0 serious/critical).
-- Downloads connected only to the first address of a source's name, and that was an IPv6 address whenever the name
-  had one (the list was sorted as text): on a host without an IPv6 route a dual-stack source such as
-  `oisf-trafficid` failed with `ConnectError` on every run. The checked addresses are now tried in the resolver's
-  order until one connects.
-- Docs: the suricata-update page and getting started still said the release URLs answer 404 until the first release.
+- Downloads try every checked address of a source's name in the resolver's order until one connects; before, only
+  the first address was tried, and that was the IPv6 one whenever the name had one, so on a host without an IPv6
+  route a dual-stack source such as `oisf-trafficid` failed with `ConnectError` on every run.
+- Static site on phones: wide tables scroll inside their own keyboard-reachable box instead of widening the page, the
+  search help text wraps and the NOTICE text is keyboard-scrollable (axe: 0 serious/critical).
+- Docs: the suricata-update page and getting started no longer say the release URLs answer 404 until the first
+  release.
+
+### Changed
+
+- README and getting started install the PyPI package (`uv tool install suriharvest` / `pipx install suriharvest`);
+  installing from Git stays the development option.
+- Repository layout: CONTRIBUTING, SECURITY and CODE_OF_CONDUCT in `.github/`, systemd units in
+  `docs/deploy/systemd/`, the screenshot tour and How it works in `docs/features.md`.
+- Web UI copy uses a plain hyphen instead of long dashes.
 
 ## [0.1.0] - 2026-11-17
 
@@ -152,4 +156,5 @@ First public release.
   removing it changed the mode of the link's target. The sweep now uses `lstat`, skips links and folders of other
   users, and `rmtree` never runs `chmod` through a link.
 
+[0.1.1]: https://github.com/threat-hunter-eu/suriharvest/releases/tag/v0.1.1
 [0.1.0]: https://github.com/threat-hunter-eu/suriharvest/releases/tag/v0.1.0

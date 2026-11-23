@@ -1,6 +1,6 @@
 [project]
 name = "suriharvest"
-version = "0.1.0"
+version = "0.1.1"
 description = "Public Suricata rule aggregator: collect free rulesets, deduplicate, validate with suricata -T and build merged rulesets"
 authors = [{ name = "suriharvest contributors" }]
 keywords = ["suricata", "ids", "rules", "threat-detection", "aggregator"]
