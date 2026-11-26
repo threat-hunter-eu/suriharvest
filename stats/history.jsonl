@@ -5,3 +5,4 @@
 {"content_id":"5d4fedb5444d4eba41b57da0056f72b8f8684a4cdf02e9dec962065936a269cf","generated_at":"2026-11-21T00:00:00Z","rules":{"suricata-7":66070,"suricata-8":66070},"tag":"rules-2026-11-21"}
 {"content_id":"cd48a95e08d4d6abf2de9c1ab4ff7a58415cceb58ef49d0e57fae2c4377a0499","generated_at":"2026-11-24T00:00:00Z","rules":{"suricata-7":66080,"suricata-8":66080},"tag":"rules-2026-11-24"}
 {"content_id":"d8fbed5d31c0ad0a4dfeda70c6ea3063e9f6d45d455704dfb79949c1fdbeac12","generated_at":"2026-11-25T00:00:00Z","rules":{"suricata-7":66081,"suricata-8":66081},"tag":"rules-2026-11-25"}
+{"content_id":"82591b787e7098930c52e260c2c7984698d3453858af12b693019356335de942","generated_at":"2026-11-26T00:00:00Z","rules":{"suricata-7":66086,"suricata-8":66086},"tag":"rules-2026-11-26"}
