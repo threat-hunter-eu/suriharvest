@@ -7,7 +7,7 @@ keywords = ["suricata", "ids", "rules", "threat-detection", "aggregator"]
 classifiers = [
     # The licence is the SPDX expression in `license` below (PEP 639): code MIT, the web UI's bundled fonts OFL-1.1.
     # No "License :: OSI Approved :: MIT License" classifier: PEP 639 deprecates License :: classifiers next to a
-    # licence expression and PyPI refuses an upload that has both. Python 3.12 and 3.13 are tested in CI.
+    # licence expression and PyPI refuses an upload that has both. Python 3.12, 3.13 and 3.15 are tested in CI.
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Environment :: Web Environment",
@@ -21,6 +21,8 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Security",
     "Topic :: System :: Networking :: Monitoring",
 ]

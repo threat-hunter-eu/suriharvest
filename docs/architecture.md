@@ -97,7 +97,7 @@ version (its search parses the JSON columns again). After an upgrade from that s
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` | every push | ruff, actionlint, pytest (3.12), CLI contract, engine tests inside the pinned Suricata 7 container, privacy gate + gitleaks |
-| `ci-full.yml`, `ci-docs.yml` | PR to main, daily (opt-in), manual | pytest (3.13), Windows, engine tests on Suricata 8, wheel install + `init` in a clean venv, web UI at 390 px, offline acceptance harness, docs examples |
+| `ci-full.yml`, `ci-docs.yml` | PR to main, daily (opt-in), manual | pytest (3.13, 3.15), Windows, engine tests on Suricata 8, wheel install + `init` in a clean venv, web UI at 390 px, offline acceptance harness, docs examples |
 | `nightly.yml` | nightly | `update` with the redistributable core sources -> `release build` -> independent re-validation of the exact files in Suricata 7 and 8 containers -> commit sid map -> signed GitHub Release (only if content changed) |
 | `catalog-health.yml` | weekly | checks every catalog URL and licence text, opens a PR touching only `health.yaml` |
 | `pages.yml` | after a release | optional static site (`site build` not implemented yet: skipped with a warning) |

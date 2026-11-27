@@ -9,6 +9,10 @@ Nightly rulesets are versioned separately by date (`rules-YYYY-MM-DD`); their ch
 
 ## [Unreleased]
 
+### Added
+
+- Python 3.14 and 3.15 are supported; CI tests 3.15 next to 3.12 and 3.13.
+
 ## [0.1.1] - 2026-11-23
 
 ### Fixed

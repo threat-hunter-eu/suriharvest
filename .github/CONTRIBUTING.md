@@ -43,7 +43,7 @@ scripts/ci-full-local.sh            # --quick: only what runs on every push
 ```
 
 **What runs when** ([docs/automation.md](../docs/automation.md#what-runs-when)): every push runs `ci.yml` only (ruff,
-actionlint, pytest on 3.12, engine tests on Suricata 7, privacy gate). Python 3.13, Windows, Suricata 8, the wheel,
+actionlint, pytest on 3.12, engine tests on Suricata 7, privacy gate). Python 3.13 and 3.15, Windows, Suricata 8, the wheel,
 the web UI, the acceptance harness and the docs examples run on pull requests to main, daily when
 `SURIHARVEST_FULL_CI_ENABLED` is `true`, and from Actions -> Run workflow.
 

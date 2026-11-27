@@ -1,6 +1,6 @@
-# The expensive checks ci.yml leaves out: Python 3.13, native Windows (billed at twice the Linux rate), Suricata 8,
-# the wheel install, the phone-width web UI and the offline acceptance harness. They run on pull requests to main
-# (not for docs-only changes: ci-docs.yml covers those), daily when the repository variable
+# The expensive checks ci.yml leaves out: Python 3.13 and 3.15, native Windows (billed at twice the Linux rate),
+# Suricata 8, the wheel install, the phone-width web UI and the offline acceptance harness. They run on pull requests
+# to main (not for docs-only changes: ci-docs.yml covers those), daily when the repository variable
 # SURIHARVEST_FULL_CI_ENABLED is `true` (off by default), and on demand. docs/automation.md#what-runs-when.
 name: CI (full)
 
@@ -24,11 +24,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-py313:
-    name: pytest (py3.13)
+  test:
+    name: pytest (py${{ matrix.python }})
     if: github.event_name != 'schedule' || vars.SURIHARVEST_FULL_CI_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 runs on every push (ci.yml); 3.15 is the newest CPython (3.14 sits between the two).
+        python: ['3.13', '3.15']
     env:
       # uv-managed CPython (like `uv tool install` for most users): its SQLite keeps the 32,766-variable default
       UV_PYTHON_PREFERENCE: only-managed
@@ -39,8 +44,10 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: '0.13.6' # uv itself; bump with the action (checksum known to it)
-          python-version: '3.13'
-      - run: uv sync --locked --python 3.13
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked --python "$PY"
+        env:
+          PY: ${{ matrix.python }}
       - run: uv run --no-sync pytest -q -n auto -m "not engine and not network"
 
   # Native Windows (no Suricata there: engine tests are deselected, updates run with --no-validate). The smoke run
