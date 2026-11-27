@@ -5,7 +5,7 @@ Seven workflows live in `.github/workflows/` ([what runs when](#what-runs-when) 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `ci.yml` | push to any branch (not `state`/`data`), pull request to main, manual | ruff (lint + format), actionlint and an "all workflows pin the same images" check; pytest on Python 3.12 (`-n auto`) and a smoke test of every CLI command and flag the other workflows call; `pytest -m engine` inside the pinned Suricata 7 image; the privacy gate + gitleaks |
-| `ci-full.yml` | pull request to main (not docs-only), daily 02:47 UTC when `SURIHARVEST_FULL_CI_ENABLED`, manual | pytest on Python 3.13, native Windows (pytest + `scripts/windows-smoke.ps1`), `pytest -m engine` inside the pinned Suricata 8 image, the wheel installed in a clean venv + `init`, the web UI at 390 px (Playwright), the offline acceptance harness (`tests/acceptance`) |
+| `ci-full.yml` | pull request to main (not docs-only), daily 02:47 UTC when `SURIHARVEST_FULL_CI_ENABLED`, manual | pytest on Python 3.13 and 3.15, native Windows (pytest + `scripts/windows-smoke.ps1`), `pytest -m engine` inside the pinned Suricata 8 image, the wheel installed in a clean venv + `init`, the web UI at 390 px (Playwright), the offline acceptance harness (`tests/acceptance`) |
 | `ci-docs.yml` | pull request to main, daily with `ci-full.yml`, manual | every `<!-- doctest -->` example of README.md and docs/ inside the Suricata 7 image |
 | `nightly.yml` | daily 03:23 UTC + manual (`force_release`, `cold_start`, `ignore_gates`) | sync the redistributable core sources, validate on Suricata 7 and 8, `release build`, `suricata -T` on the exact files to publish, commit the sid map to the `state` branch, sign (opt-in, public only), publish a GitHub Release `rules-YYYY-MM-DD`, keep stats on a `data` branch, open an issue when a scheduled run fails |
 | `catalog-health.yml` | Mondays 04:41 UTC + manual | `suriharvest sources check --licences` on the bundled catalog; opens or updates a PR that only touches `src/suriharvest/catalog/health.yaml` |
@@ -20,7 +20,7 @@ Linux rate, so the checks are split by cost. `tests/test_workflows.py` keeps the
 | Event | Workflows | Jobs |
 |---|---|---|
 | push to any branch | `ci.yml` | `lint` (ruff, ruff format, actionlint, image pins), `test` (pytest, Python 3.12), `engine` (Suricata 7), `privacy` (about 5 billed minutes) |
-| pull request to main | `ci.yml` `lint` + `privacy` (and `test` + `engine` for a fork's PR, whose branch had no push run here), `ci-full.yml`, `ci-docs.yml` | Python 3.13, Windows, Suricata 8, wheel, web UI at 390 px, acceptance, docs examples; a docs-only change (`*.md`, `docs/`) skips `ci-full.yml` but not the docs examples |
+| pull request to main | `ci.yml` `lint` + `privacy` (and `test` + `engine` for a fork's PR, whose branch had no push run here), `ci-full.yml`, `ci-docs.yml` | Python 3.13 and 3.15, Windows, Suricata 8, wheel, web UI at 390 px, acceptance, docs examples; a docs-only change (`*.md`, `docs/`) skips `ci-full.yml` but not the docs examples |
 | daily 02:47 UTC | `ci-full.yml` + `ci-docs.yml` | as for a pull request, only when the repository variable `SURIHARVEST_FULL_CI_ENABLED` is `true` (default off: the jobs are skipped and nothing is billed) |
 | manual (Actions -> Run workflow) | any of the three | everything in that workflow, on the branch you pick |
 

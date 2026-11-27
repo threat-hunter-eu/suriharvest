@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs on this machine what ci.yml, ci-full.yml and ci-docs.yml run on GitHub (docs/automation.md#what-runs-when),
-# without spending Actions minutes: ruff, actionlint (when installed), pytest on Python 3.12 and 3.13, the engine
+# without spending Actions minutes: ruff, actionlint (when installed), pytest on Python 3.12, 3.13 and 3.15, the engine
 # tests and the docs examples against the local `suricata`, the web UI at 390 px (Playwright), the offline acceptance
 # harness (clean wheel) and the privacy gate. Native Windows and the second Suricata major have no local equivalent:
 # run the engine tests again with the other `suricata` on PATH, or dispatch ci-full.yml.
@@ -8,7 +8,7 @@
 #   scripts/ci-full-local.sh            # everything; a failed step does not stop the others
 #   scripts/ci-full-local.sh --quick    # only what runs on every push (ci.yml)
 #
-# The 3.12/3.13 environments live in ${SURIHARVEST_CI_ENVS:-~/.cache/suriharvest-ci}, outside the checkout.
+# The 3.12/3.13/3.15 environments live in ${SURIHARVEST_CI_ENVS:-~/.cache/suriharvest-ci}, outside the checkout.
 # Exit: 0 when every step passed, 1 otherwise (the failed steps are listed at the end).
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 2
@@ -36,6 +36,7 @@ step "privacy gate" python3 -I scripts/maintainer/privacy_gate.py . --allowlist 
 
 if [ "$QUICK" = 0 ]; then
     step "pytest (py3.13)" on 3.13 pytest -q -n auto -m "not engine and not network"
+    step "pytest (py3.15)" on 3.15 pytest -q -n auto -m "not engine and not network"
     step "docs examples" uv run --no-sync pytest -q -rs -m docs tests/test_docs.py
     step "web UI at 390 px (Playwright)" bash -c 'uv run --locked --group ui playwright install chromium-headless-shell &&
         SURIHARVEST_REQUIRE_PLAYWRIGHT=1 uv run --locked --group ui pytest -q -rs tests/test_web_layout.py'
