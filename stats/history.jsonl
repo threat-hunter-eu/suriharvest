@@ -7,3 +7,4 @@
 {"content_id":"d8fbed5d31c0ad0a4dfeda70c6ea3063e9f6d45d455704dfb79949c1fdbeac12","generated_at":"2026-11-25T00:00:00Z","rules":{"suricata-7":66081,"suricata-8":66081},"tag":"rules-2026-11-25"}
 {"content_id":"82591b787e7098930c52e260c2c7984698d3453858af12b693019356335de942","generated_at":"2026-11-26T00:00:00Z","rules":{"suricata-7":66086,"suricata-8":66086},"tag":"rules-2026-11-26"}
 {"content_id":"eda6889fdafb7a9bae0349c6098c62757f62608d8d3783184e2b898d6ac842b1","generated_at":"2026-11-27T00:00:00Z","rules":{"suricata-7":66087,"suricata-8":66087},"tag":"rules-2026-11-27"}
+{"content_id":"8dabef7ba5b4abcaad93c2a8fbbfd8997db818382d269268708f7011a0dea10f","generated_at":"2026-11-28T00:00:00Z","rules":{"suricata-7":66098,"suricata-8":66098},"tag":"rules-2026-11-28"}
